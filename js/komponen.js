@@ -21,7 +21,7 @@ window.LabukuUI = (function () {
     var st = { mode: 'utama', manual: false };
     root.innerHTML = '';
     var modeBox = mk('div', 'wil-mode');
-    var MODES = [['utama', 'Kec. ' + home.utama[1]], ['kab', 'Kec. lain di ' + kabPendek(home.kab[1])], ['luar', 'Luar ' + kabPendek(home.kab[1])]];
+    var MODES = [['utama', 'Kec. ' + home.utama[1]], ['kab', 'Kec. lain'], ['luar', 'Luar ' + kabPendek(home.kab[1])]];
     MODES.forEach(function (m) {
       var b = mk('button', 'wil-mode-btn', m[1]);
       b.type = 'button';
@@ -76,8 +76,8 @@ window.LabukuUI = (function () {
         f[k].sel.style.display = on ? 'none' : '';
         f[k].inp.style.display = on ? '' : 'none';
       });
-      hint.textContent = on ? 'Ketik nama kabupaten/kota, kecamatan, dan desa/kelurahan.' : '';
-      hint.style.display = on ? '' : 'none';
+      hint.textContent = '';
+      hint.style.display = 'none';
       update();
     }
     function setMode(m) {
@@ -85,7 +85,7 @@ window.LabukuUI = (function () {
       Array.prototype.forEach.call(modeBox.children, function (b) { b.classList.toggle('active', b.getAttribute('data-mode') === m); });
       ['kab', 'kec', 'desa'].forEach(function (k) { f[k].inp.value = ''; });
       show('prov', m === 'luar'); show('kab', m === 'luar'); show('kec', m !== 'utama'); show('desa', true);
-      if (m === 'utama') fill('desa', homeDesa(home.utama[0]), 'Pilih desa/kelurahan di Kec. ' + home.utama[1] + '...');
+      if (m === 'utama') fill('desa', homeDesa(home.utama[0]), 'Pilih desa/kelurahan...');
       else if (m === 'kab') { fill('kec', home.kec.map(function (x) { return [x[0], x[1]]; }), 'Pilih kecamatan...'); kosong('desa', 'Pilih kecamatan dulu'); }
       else fill('prov', home.provinsi, 'Pilih provinsi...');
       setManual(m === 'luar');
@@ -146,13 +146,12 @@ window.LabukuUI = (function () {
     var openKat = null; /* v5: hanya satu kategori terbuka; membuka kategori lain menutup yang sebelumnya */
     function urut(a, b) { return (b.pakai - a.pakai) || String(a.nama).localeCompare(String(b.nama)); }
     function pendek(k) { return String(k || '').replace(/^Layanan /, ''); }
-    function itemBtn(it, sub, showKat) {
+    /* v6.1: cukup nama layanan — tanpa kategori kecil & angka pemakaian (lebih ringkas). */
+    function itemBtn(it, sub) {
       var b = mk('button', 'lpx-item' + (sub ? ' sub' : ''));
       b.type = 'button';
       b.setAttribute('data-id', it.id);
       b.appendChild(mk('span', '', it.nama));
-      var meta = (showKat ? pendek(it.kategori) : '') + (it.pakai ? (showKat ? ' · ' : '') + it.pakai + 'x' : '');
-      if (meta) b.appendChild(mk('small', '', meta));
       b.addEventListener('click', function () { opts.onPick(it); });
       return b;
     }
@@ -168,16 +167,16 @@ window.LabukuUI = (function () {
           var hay = (it.nama + ' ' + it.kategori).toLowerCase();
           return words.every(function (w) { return hay.indexOf(w) !== -1; });
         }).slice(0, 40);
-        if (!hasil.length) { box.appendChild(mk('div', 'lpx-empty', 'Layanan tidak ditemukan. Tanyakan ke petugas atau pilih kategori Lain-lain.')); return; }
-        hasil.forEach(function (it) { box.appendChild(itemBtn(it, false, true)); });
+        if (!hasil.length) { box.appendChild(mk('div', 'lpx-empty', 'Layanan tidak ditemukan.')); return; }
+        hasil.forEach(function (it) { box.appendChild(itemBtn(it, false)); });
         return;
       }
       var sering = items.filter(function (it) { return it.pakai > 0; }).slice(0, 5);
       if (sering.length) {
-        box.appendChild(mk('div', 'lpx-head', 'Paling sering dipakai'));
-        sering.forEach(function (it) { box.appendChild(itemBtn(it, false, true)); });
+        box.appendChild(mk('div', 'lpx-head', 'Teratas'));
+        sering.forEach(function (it) { box.appendChild(itemBtn(it, false)); });
       }
-      box.appendChild(mk('div', 'lpx-head', 'Semua layanan per kategori'));
+      box.appendChild(mk('div', 'lpx-head', 'Kategori'));
       (opts.kategori || []).forEach(function (kat) {
         var isi = items.filter(function (it) { return it.kategori === kat; });
         if (!isi.length) return;
@@ -186,10 +185,9 @@ window.LabukuUI = (function () {
         h.setAttribute('data-kat', kat);
         var kiri = mk('span', '', (openKat === kat ? '▾ ' : '▸ ') + pendek(kat));
         h.appendChild(kiri);
-        h.appendChild(mk('span', 'lpx-n', isi.length + ' layanan'));
         h.addEventListener('click', function () { openKat = openKat === kat ? null : kat; render(''); });
         box.appendChild(h);
-        if (openKat === kat) isi.forEach(function (it) { box.appendChild(itemBtn(it, true, false)); });
+        if (openKat === kat) isi.forEach(function (it) { box.appendChild(itemBtn(it, true)); });
       });
       box.scrollTop = st;
     }

@@ -74,23 +74,30 @@ function mulaiAplikasi() {
   }
   let simpan = null;
   try { simpan = JSON.parse(lsGet(INDEX_BOOT_KEY) || 'null'); } catch (e) { simpan = null; }
-  if (simpan && simpan.ok && lsGet(TOKEN_KEY)) {
-    INDEX_BOOT = simpan;
-    initApp();
-    google.script.run
-      .withSuccessHandler(function (res) { if (res && res.ok) lsSet(INDEX_BOOT_KEY, JSON.stringify(res)); })
-      .withFailureHandler(function () {})
-      .getIndexBoot();
-    return;
-  }
+  /* v6.1: layar langsung tampil tanpa menunggu server. Sudah pernah masuk → data dari cache +
+     satu panggilan getBootstrap. Belum masuk → layar Masuk seketika; status aktivasi dicek di latar. */
+  INDEX_BOOT = (simpan && simpan.ok) ? simpan : { ok: true, activated: true, appName: 'LABUKU Desk', tagline: 'Layanan dan Pembukuan KUA', instansi: '' };
+  if (lsGet(TOKEN_KEY)) { initApp(); return; }
+  initApp();
   google.script.run
     .withSuccessHandler(function (res) {
-      INDEX_BOOT = res || null;
-      if (res && res.ok) lsSet(INDEX_BOOT_KEY, JSON.stringify(res));
-      initApp();
+      if (!res) return;
+      if (res.ok) { INDEX_BOOT = res; lsSet(INDEX_BOOT_KEY, JSON.stringify(res)); }
+      if (window.AppState.token || document.getElementById('authScreen').style.display === 'none') return;
+      document.getElementById('authInstansi').textContent = res.instansi || res.appName || 'KUA';
+      const diLogin = document.getElementById('authLogin').style.display !== 'none';
+      if (res.ok === false) showAuth(res.activated ? 'login' : 'activate', 'Aplikasi belum siap: ' + (res.message || 'jalankan setupAppEnvironment().'));
+      else if (res.activated === false && diLogin && !document.getElementById('loginPw').value) showAuth('activate');
     })
-    .withFailureHandler(function (err) { tampilGagalMuat('Aplikasi gagal dimuat: ' + (err && err.message ? err.message : err)); })
+    .withFailureHandler(function () { /* tetap di layar Masuk; kesalahan koneksi tampil saat menekan Masuk */ })
     .getIndexBoot();
+}
+
+/* v6.1: identitas KUA untuk layar Masuk berikutnya diperbarui dari data bootstrap (tanpa panggilan tambahan). */
+function simpanIndexBootDariConfig_(config) {
+  if (!config) return;
+  INDEX_BOOT = { ok: true, activated: true, appName: config.appName || 'LABUKU Desk', tagline: config.tagline || '', instansi: config.instansi || '' };
+  lsSet(INDEX_BOOT_KEY, JSON.stringify(INDEX_BOOT));
 }
 
 function tampilGagalMuat(pesan) {
@@ -205,7 +212,14 @@ function applyBootData(data) {
 }
 
 function fetchBootstrap(blocking, done) {
-  gsr(function (res) {
+  gsr(function (res) { prosesBootstrap_(res, blocking, done); }, function (err) {
+    if (done) done(null);
+    if (blocking) { hideLoadingOverlay(); showAuth('login', 'Tidak dapat terhubung ke server: ' + (err.message || err)); }
+  }).getBootstrap();
+}
+
+function prosesBootstrap_(res, blocking, done) {
+  {
     if (done) done(res);
     if (!res || !res.success) {
       if (blocking) { hideLoadingOverlay(); showAuth('login', (res && res.message) || 'Gagal memuat data.'); }
@@ -218,14 +232,31 @@ function fetchBootstrap(blocking, done) {
     if (foFilter.periode === 'today') window.AppState.foAt = Date.now();
     if (boRangeLoaded === 'default') window.AppState.boAt = Date.now();
     saveAppStateCache();
+    simpanIndexBootDariConfig_(res.data.config);
+    jadwalPrefetch_();
     if (firstEntry) { enterApp(); hideLoadingOverlay(); return; }
     if (namaMasukHilang()) return;
     applyUserToUI();
     rerenderCurrentSection();
-  }, function (err) {
-    if (done) done(null);
-    if (blocking) { hideLoadingOverlay(); showAuth('login', 'Tidak dapat terhubung ke server: ' + (err.message || err)); }
-  }).getBootstrap();
+  }
+}
+
+/*
+ * v6.1 (prefetch): setelah data awal tiba, ambil diam-diam data menu yang biasanya ditunggu
+ * saat pertama dibuka — Katalog lengkap (bila belum ada di cache) dan daftar Tim (Kepala KUA).
+ * Sekali per sesi; tidak memblokir apa pun.
+ */
+let prefetchSudah = false;
+function jadwalPrefetch_() {
+  if (prefetchSudah) return;
+  prefetchSudah = true;
+  setTimeout(function () {
+    if (!window.AppState.token) { prefetchSudah = false; return; }
+    if (!katalogLengkap()) muatKatalogLengkap(false);
+    if (isAdmin() && !window._usersCache) {
+      gsr(function (res) { if (res && res.success && !window._usersCache) window._usersCache = res.data; }, function () {}).getManajemenUsers();
+    }
+  }, 1200);
 }
 
 /* Setelah data segar tiba: perbarui tampilan yang sedang dibuka tanpa memindah halaman. */
@@ -289,12 +320,14 @@ function showLoadingOverlay(text) {
   overlay.style.opacity = '1';
 }
 
-function onTokenIssued(token) {
+function onTokenIssued(token, boot) {
   window.AppState.token = token;
   lsSet(TOKEN_KEY, token);
   document.getElementById('authScreen').style.display = 'none';
   showLoadingOverlay('Menyiapkan data...');
-  fetchBootstrap(true);
+  /* v6.1: data awal ikut terkirim bersama token → tidak perlu menunggu panggilan kedua. */
+  if (boot) prosesBootstrap_({ success: true, data: boot, message: 'OK' }, true);
+  else fetchBootstrap(true);
 }
 
 function submitActivation() {
@@ -309,11 +342,11 @@ function submitActivation() {
   google.script.run
     .withSuccessHandler(res => {
       btn.disabled = false;
-      if (res && res.success) onTokenIssued(res.data.token);
+      if (res && res.success) onTokenIssued(res.data.token, res.data.boot);
       else msg.textContent = (res && res.message) || 'Aktivasi gagal.';
     })
     .withFailureHandler(err => { btn.disabled = false; msg.textContent = 'Koneksi gagal: ' + (err.message || err); })
-    .activateApp(code, pw);
+    .activateApp(code, pw, true);
 }
 
 function submitLogin() {
@@ -325,12 +358,12 @@ function submitLogin() {
   google.script.run
     .withSuccessHandler(res => {
       btn.disabled = false; btn.textContent = 'Masuk';
-      if (res && res.success) { document.getElementById('loginPw').value = ''; onTokenIssued(res.data.token); }
+      if (res && res.success) { document.getElementById('loginPw').value = ''; onTokenIssued(res.data.token, res.data.boot); }
       else if (res && res.code === 'NOT_ACTIVATED') showAuth('activate', res.message);
       else msg.textContent = (res && res.message) || 'Gagal masuk.';
     })
     .withFailureHandler(err => { btn.disabled = false; btn.textContent = 'Masuk'; msg.textContent = 'Koneksi gagal: ' + (err.message || err); })
-    .loginApp(pw);
+    .loginApp(pw, true);
 }
 
 function renderWhoList() {
@@ -463,6 +496,8 @@ function navigateTo(sectionId, params) {
 
   window.AppState.currentSection = sectionId;
   closeSidebar();
+  tandaiNavBawah_(sectionId);
+  tutupLainnya();
 
   const loaders = {
     dashboard: loadDashboard,
@@ -496,6 +531,69 @@ function closeSidebar() {
   document.getElementById('sidebar').classList.remove('show');
   document.querySelector('.sidebar-overlay').classList.remove('show');
 }
+
+// ── v6.1: navigasi bawah & menu "Lainnya" (HP/tablet) ──
+function tandaiNavBawah_(sectionId) {
+  const peta = { workspace: 'backoffice', manajemen: 'lainnya' };
+  const aktif = peta[sectionId] || sectionId;
+  document.querySelectorAll('#bottomNav [data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === aktif));
+}
+function bukaLainnya() {
+  document.getElementById('moreNama').textContent = document.getElementById('userMiniName').textContent;
+  document.getElementById('moreRole').textContent = document.getElementById('userMiniRole').textContent;
+  document.getElementById('moreAvatar').textContent = document.getElementById('userAvatarInitial').textContent;
+  document.getElementById('moreAdmin').style.display = isAdmin() ? '' : 'none';
+  document.getElementById('moreDark').checked = document.documentElement.getAttribute('data-theme') === 'dark';
+  document.getElementById('moreSheet').classList.add('show');
+  document.getElementById('moreOverlay').classList.add('show');
+}
+function tutupLainnya() {
+  const s = document.getElementById('moreSheet');
+  if (s) s.classList.remove('show');
+  const o = document.getElementById('moreOverlay');
+  if (o) o.classList.remove('show');
+}
+function pilihLainnya(aksi) {
+  tutupLainnya();
+  if (aksi === 'manajemen') navigateTo('manajemen');
+  else if (aksi === 'nama') gantiNamaMasuk();
+  else if (aksi === 'keluar') logout();
+}
+/* Panel filter di HP tersembunyi agar daftar langsung terlihat; tombol "Filter" membuka/menutup. */
+function toggleFilterHp(id, btn) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  const buka = el.classList.toggle('buka');
+  if (btn) btn.classList.toggle('active', buka);
+}
+
+/*
+ * v6.1: di HP setiap tabel .lb-table tampil sebagai kartu (CSS). Label tiap baris diambil
+ * otomatis dari judul kolom (thead) — fungsi render tabel tidak perlu diubah.
+ */
+function labelTabelKartu_(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('table.lb-table').forEach(t => {
+    const judul = Array.from(t.querySelectorAll('thead th')).map(th => th.textContent.trim());
+    t.querySelectorAll('tbody tr').forEach(tr => {
+      Array.from(tr.children).forEach((td, i) => {
+        if (td.hasAttribute('data-label')) return;
+        const lbl = judul[i] || '';
+        td.setAttribute('data-label', lbl);
+        if (!lbl || lbl === 'Aksi') td.classList.add('td-aksi');
+      });
+    });
+  });
+}
+(function pasangLabelTabel_() {
+  let antre = false;
+  const jalankan = () => { antre = false; labelTabelKartu_(document.getElementById('mainContent')); };
+  const obs = new MutationObserver(() => { if (!antre) { antre = true; requestAnimationFrame(jalankan); } });
+  document.addEventListener('DOMContentLoaded', () => {
+    const main = document.getElementById('mainContent');
+    if (main) obs.observe(main, { childList: true, subtree: true });
+  });
+})();
 
 /**
  * Tombol Refresh di topbar (gas-instant-ux): memuat ulang data section yang
@@ -935,12 +1033,13 @@ function renderFrontOffice() {
           <h2 class="page-heading">Front Office</h2>
           <p class="page-sub mb-0" id="foSub">Antrean</p>
         </div>
-        <div class="d-flex gap-2 flex-wrap">
-          <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> Link &amp; QR Form Publik</button>
+        <div class="d-flex gap-2 flex-wrap head-aksi">
+          <button class="btn btn-labuku-outline btn-filter-hp" onclick="toggleFilterHp('foFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
+          <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> <span class="label-lebar">Link &amp; QR Form Publik</span><span class="label-hp">QR</span></button>
           <button class="btn btn-labuku-primary" onclick="openTambahAntrean()"><i class="bi bi-plus-lg"></i> Tambah Antrean</button>
         </div>
       </div>
-      <div class="lb-card filter-bar mb-3" id="foFilterBar"></div>
+      <div class="lb-card filter-bar filter-hp mb-3" id="foFilterBar"></div>
       <div class="fo-stats" id="foStats"></div>
       <div class="table-wrap" id="foTableBox"></div>`;
   }
@@ -1173,10 +1272,10 @@ function layananPickerHtml(prefix, selectedId) {
   const sel = katalogById(selectedId);
   return `
     <input type="hidden" id="${prefix}Katalog" value="${sel ? sel.ID : ''}">
-    <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="Cari layanan, mis. nikah, wakaf, kiblat... atau pilih kategori di bawah"
+    <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="Cari layanan..."
       value="${sel ? escapeHtml(sel.NamaLayanan) : ''}" oninput="document.getElementById('${prefix}Katalog').value='';renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
     <div class="lpx-box" id="${prefix}List" style="display:none;"></div>
-    <div class="small text-secondary mt-1" id="${prefix}Info">${sel ? 'Dipilih: ' + escapeHtml(sel.NamaLayanan) + ' · ' + escapeHtml(sel.Kategori) : 'Paling sering dipakai tampil di atas. Klik kategori untuk melihat layanannya.'}</div>`;
+    <div class="small text-secondary mt-1" id="${prefix}Info">${sel ? 'Dipilih: ' + escapeHtml(sel.NamaLayanan) : ''}</div>`;
 }
 
 function renderLayananPicker(prefix) {
@@ -1198,7 +1297,7 @@ function pilihLayananPicker(prefix, id) {
   if (!k) return;
   document.getElementById(prefix + 'Katalog').value = k.ID;
   document.getElementById(prefix + 'Cari').value = k.NamaLayanan;
-  document.getElementById(prefix + 'Info').textContent = 'Dipilih: ' + k.NamaLayanan + ' · ' + k.Kategori;
+  document.getElementById(prefix + 'Info').textContent = 'Dipilih: ' + k.NamaLayanan;
   document.getElementById(prefix + 'List').style.display = 'none';
 }
 
@@ -1210,9 +1309,9 @@ function openTambahAntrean(prefill) {
   const p = prefill || {};
   openFormModal('Tambah Antrean', `
     <div class="mb-3">
-      <label class="form-label">Pemohon lama / layanan pending?</label>
+      <label class="form-label">Pemohon lama (opsional)</label>
       <div class="input-group">
-        <input type="text" class="form-control" id="taCari2" placeholder="Cari nama, NIK, No. HP, atau ID layanan" onkeydown="if(event.key==='Enter'){event.preventDefault();cariDataLamaFo();}">
+        <input type="text" class="form-control" id="taCari2" placeholder="Nama / NIK / No. HP / ID layanan" onkeydown="if(event.key==='Enter'){event.preventDefault();cariDataLamaFo();}">
         <button class="btn btn-labuku-outline" type="button" onclick="cariDataLamaFo()"><i class="bi bi-search"></i></button>
       </div>
       <div id="taCariHasil" class="mt-2"></div>
@@ -1271,7 +1370,7 @@ function submitTambahAntrean() {
   const wil = taWil ? taWil.getValue() : { ok: false, error: 'Data wilayah belum dimuat. Klik tombol Refresh.' };
   if (!wil.ok) { showToast('Peringatan', wil.error, 'warning'); return; }
   data.wilayah = wil.data;
-  if (!data.katalogId) { showToast('Peringatan', 'Pilih layanan dari daftar (cari, atau klik kategori lalu layanan).', 'warning'); renderLayananPicker('ta'); return; }
+  if (!data.katalogId) { showToast('Peringatan', 'Pilih layanan dari daftar.', 'warning'); renderLayananPicker('ta'); return; }
   lastTambahData = Object.assign({}, data, { wilayahState: taWil.getState() });
   closeFormModal();
 
@@ -1547,10 +1646,11 @@ function renderBackOffice() {
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
           <span class="badge-status badge-proses" id="boCount"></span>
+          <button class="btn btn-labuku-outline btn-sm-pill btn-filter-hp" onclick="toggleFilterHp('boFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
           <button class="btn btn-labuku-outline btn-sm-pill" id="boExportBtn" onclick="exportBoCsv()"><i class="bi bi-download"></i> Export CSV</button>
         </div>
       </div>
-      <div class="lb-card filter-bar mb-3" id="boFilterBar"></div>
+      <div class="lb-card filter-bar filter-hp mb-3" id="boFilterBar"></div>
       <div class="table-wrap" id="boTableBox"></div>`;
   }
   renderBoFilterBar();
@@ -2196,8 +2296,8 @@ function renderKnowledgeShell() {
     </div>
     <div class="row g-3">
       <div class="col-lg-3">
-        <div class="lb-card">
-          <div class="fw-bold small text-secondary mb-2" style="text-transform:uppercase;letter-spacing:.04em;">Kategori Layanan</div>
+        <div class="lb-card kat-wrap">
+          <div class="fw-bold small text-secondary mb-2 kat-judul" style="text-transform:uppercase;letter-spacing:.04em;">Kategori Layanan</div>
           <ul class="knowledge-cat-list" id="knowledgeCatList"></ul>
         </div>
       </div>
@@ -2244,7 +2344,10 @@ const KATEGORI_ICON = {
 function selectKnowledgeKategori(kategori) {
   knowledgeActiveKategori = kategori;
   knowledgeActiveLayanan = null;
-  document.querySelectorAll('#knowledgeCatList .knowledge-cat-item').forEach(el => el.classList.toggle('active', el.dataset.kat === kategori));
+  document.querySelectorAll('#knowledgeCatList .knowledge-cat-item').forEach(el => {
+    el.classList.toggle('active', el.dataset.kat === kategori);
+    if (el.dataset.kat === kategori && el.scrollIntoView) el.scrollIntoView({ block: 'nearest', inline: 'center' });
+  });
   renderKnowledgeContent(kategori);
 }
 

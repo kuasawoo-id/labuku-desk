@@ -2,7 +2,7 @@
 <html lang="id" data-theme="light">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>LABUKU Desk — Layanan dan Pembukuan KUA</title>
 
   <!-- Penjaga "hanya berputar": bila JavaScript utama gagal di-parse (SyntaxError),
@@ -138,13 +138,13 @@
       </div>
       <div class="topbar-search d-none d-md-flex" id="topbarSearchBox" style="display:none;">
         <i class="bi bi-search"></i>
-        <input type="text" id="globalSearchInput" placeholder="Cari nama, nomor antrean, atau ID layanan..." oninput="handleGlobalSearch(this.value)">
+        <input type="text" id="globalSearchInput" placeholder="Cari nama, nomor, atau ID layanan" oninput="handleGlobalSearch(this.value)">
       </div>
       <div class="topbar-actions">
         <button class="btn btn-icon" id="topbarRefreshBtn" title="Muat Ulang" onclick="refreshCurrentSection()"><i class="bi bi-arrow-clockwise"></i></button>
-        <button class="btn btn-icon" title="Kalender"><i class="bi bi-calendar3"></i></button>
-        <button class="btn btn-icon" title="Notifikasi"><i class="bi bi-bell"></i><span class="dot-badge"></span></button>
-        <div class="topbar-avatar" id="topbarAvatar">A</div>
+        <button class="btn btn-icon topbar-lebar" title="Kalender"><i class="bi bi-calendar3"></i></button>
+        <button class="btn btn-icon topbar-lebar" title="Notifikasi"><i class="bi bi-bell"></i><span class="dot-badge"></span></button>
+        <div class="topbar-avatar" id="topbarAvatar" onclick="bukaLainnya()">A</div>
       </div>
     </div>
 
@@ -160,6 +160,28 @@
     <section id="section-knowledge" class="content-section"></section>
     <!-- Section: Pengaturan (tim, template WA, umum, keamanan) -->
     <section id="section-manajemen" class="content-section"></section>
+
+    <!-- v6.1: navigasi bawah (HP/tablet) -->
+    <nav class="bottom-nav" id="bottomNav" aria-label="Navigasi utama">
+      <button type="button" data-nav="dashboard" onclick="navigateTo('dashboard')"><i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span></button>
+      <button type="button" data-nav="frontoffice" onclick="navigateTo('frontoffice')"><i class="bi bi-ticket-perforated"></i><span>Front Office</span></button>
+      <button type="button" data-nav="backoffice" onclick="navigateTo('backoffice')"><i class="bi bi-briefcase-fill"></i><span>Back Office</span></button>
+      <button type="button" data-nav="knowledge" onclick="navigateTo('knowledge')"><i class="bi bi-journal-richtext"></i><span>Katalog</span></button>
+      <button type="button" data-nav="lainnya" onclick="bukaLainnya()"><i class="bi bi-three-dots"></i><span>Lainnya</span></button>
+    </nav>
+    <div class="more-overlay" id="moreOverlay" onclick="tutupLainnya()"></div>
+    <div class="more-sheet" id="moreSheet" role="dialog" aria-label="Menu lainnya">
+      <div class="more-handle"></div>
+      <div class="more-user">
+        <div class="user-avatar" id="moreAvatar">A</div>
+        <div><div class="fw-semibold" id="moreNama">-</div><div class="small text-secondary" id="moreRole">-</div></div>
+      </div>
+      <button type="button" class="more-item" id="moreAdmin" onclick="pilihLainnya('manajemen')"><i class="bi bi-gear-fill"></i> Pengaturan</button>
+      <label class="more-item" for="moreDark"><i class="bi bi-moon-stars"></i> Mode Gelap
+        <input class="form-check-input ms-auto" type="checkbox" id="moreDark" onchange="toggleDarkMode()"></label>
+      <button type="button" class="more-item" onclick="pilihLainnya('nama')"><i class="bi bi-person-badge"></i> Ganti nama</button>
+      <button type="button" class="more-item text-danger" onclick="pilihLainnya('keluar')"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+    </div>
 
   </main>
 
@@ -182,7 +204,7 @@
 
   <!-- Modal: Preview Dokumen -->
   <div class="modal fade" id="previewModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title">Pratinjau Dokumen</h5>
@@ -199,7 +221,7 @@
 
   <!-- Modal: Form Generik (dipakai berulang oleh berbagai modul) -->
   <div class="modal fade" id="formModal" tabindex="-1">
-    <div class="modal-dialog modal-dialog-centered modal-lg">
+    <div class="modal-dialog modal-dialog-centered modal-lg modal-fullscreen-sm-down">
       <div class="modal-content">
         <div class="modal-header">
           <h5 class="modal-title" id="formModalTitle">Form</h5>
