@@ -1,0 +1,19 @@
+  /* ===== v4: Komponen bersama (dashboard & form publik) ===== */
+  .wil-mode { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .5rem; }
+  .wil-mode-btn { border: 1px solid #CBD5C9; background: transparent; color: inherit; border-radius: 999px; padding: .3rem .8rem; font-size: .8rem; line-height: 1.3; }
+  .wil-mode-btn.active { background: #1B4332; border-color: #1B4332; color: #fff; }
+  .wil-grid { display: grid; grid-template-columns: 1fr; gap: .5rem; }
+  @media (min-width: 576px) { .wil-grid { grid-template-columns: 1fr 1fr; } }
+  .wil-f { min-width: 0; }
+  .wil-lbl { display: block; font-size: .72rem; font-weight: 600; opacity: .75; margin-bottom: .15rem; }
+  .wil-ringkas { font-size: .78rem; opacity: .75; margin-top: .35rem; }
+  .wil-hint { font-size: .75rem; color: #92400E; margin-top: .35rem; }
+  .lpx-box { border: 1px solid #E5E7EB; border-radius: 10px; margin-top: .35rem; max-height: 300px; overflow-y: auto; background: inherit; }
+  .lpx-head { font-size: .7rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; opacity: .6; padding: .5rem .75rem .25rem; }
+  .lpx-item, .lpx-kat { display: flex; justify-content: space-between; align-items: center; gap: .5rem; width: 100%; text-align: left; border: 0; border-bottom: 1px solid rgba(127,127,127,.15); background: transparent; color: inherit; padding: .5rem .75rem; font-size: .88rem; }
+  .lpx-item:hover, .lpx-kat:hover { background: rgba(27,67,50,.06); }
+  .lpx-item small { opacity: .6; font-size: .72rem; white-space: nowrap; }
+  .lpx-item.sub { padding-left: 1.5rem; }
+  .lpx-kat { font-weight: 600; }
+  .lpx-kat .lpx-n { font-weight: 400; font-size: .75rem; opacity: .6; }
+  .lpx-empty { padding: .6rem .75rem; font-size: .85rem; opacity: .7; }
