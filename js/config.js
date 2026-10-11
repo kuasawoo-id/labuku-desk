@@ -9,5 +9,5 @@
  *   GAS_URL: 'https://script.google.com/macros/s/AKfycbx..../exec'
  */
 window.LABUKU_CONFIG = {
-  GAS_URL: 'ISI_URL_EXEC_APPS_SCRIPT_DI_SINI'
+  GAS_URL: 'https://script.google.com/macros/s/AKfycbyp6oH0i5EX-ehzhzT_iX92K7QnVrOMfPiMRZoGGR5NQk3ugA4DZ9MKIzPrQmpZEuq3yA/exec'
 };
