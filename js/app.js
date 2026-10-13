@@ -76,7 +76,7 @@ function mulaiAplikasi() {
   try { simpan = JSON.parse(lsGet(INDEX_BOOT_KEY) || 'null'); } catch (e) { simpan = null; }
   /* v6.1: layar langsung tampil tanpa menunggu server. Sudah pernah masuk → data dari cache +
      satu panggilan getBootstrap. Belum masuk → layar Masuk seketika; status aktivasi dicek di latar. */
-  INDEX_BOOT = (simpan && simpan.ok) ? simpan : { ok: true, activated: true, appName: 'LABUKU Desk', tagline: 'Layanan dan Pembukuan KUA', instansi: '' };
+  INDEX_BOOT = (simpan && simpan.ok) ? simpan : { ok: true, activated: true, appName: 'LABUKU Desk', tagline: 'Layanan Administrasi dan Pembukuan KUA', instansi: '' };
   if (lsGet(TOKEN_KEY)) { initApp(); return; }
   initApp();
   google.script.run
@@ -454,10 +454,12 @@ function applyUserToUI() {
   const nama = window.AppState.who || 'Tim KUA';
   const u = (window.AppState.users || []).find(x => x.Nama === nama) || {};
   const initial = nama.trim().charAt(0).toUpperCase() || 'A';
-  document.getElementById('userAvatarInitial').textContent = initial;
-  document.getElementById('topbarAvatar').textContent = initial;
-  document.getElementById('userMiniName').textContent = nama;
-  document.getElementById('userMiniRole').textContent = 'Masuk sebagai · ' + roleLabel(u.Role);
+  // v6.4: nama & peran tampil di kanan atas (topbar); klik → Ganti nama
+  document.getElementById('topbarNama').textContent = nama;
+  document.getElementById('topbarRole').textContent = roleLabel(u.Role);
+  document.getElementById('moreNama').textContent = nama;
+  document.getElementById('moreRole').textContent = 'Masuk sebagai · ' + roleLabel(u.Role);
+  document.getElementById('moreAvatar').textContent = initial;
   const admin = isAdmin();
   document.body.classList.toggle('non-admin', !admin);
   const nav = document.getElementById('navManajemen');
@@ -522,7 +524,17 @@ function toggleDarkMode() {
   const next = html.getAttribute('data-theme') === 'dark' ? 'light' : 'dark';
   html.setAttribute('data-theme', next);
   localStorage.setItem('labuku_theme', next);
+  ikonModeMalam_();
 }
+/** v6.4: tombol mode malam di topbar (kanan tombol muat ulang): bulan = gelapkan, matahari = terangkan. */
+function ikonModeMalam_() {
+  const b = document.getElementById('topbarDarkBtn');
+  if (!b) return;
+  const gelap = document.documentElement.getAttribute('data-theme') === 'dark';
+  b.innerHTML = '<i class="bi ' + (gelap ? 'bi-sun' : 'bi-moon-stars') + '"></i>';
+  b.title = gelap ? 'Mode terang' : 'Mode malam';
+}
+document.addEventListener('DOMContentLoaded', ikonModeMalam_);
 /* v6.3: sidebar desktop bisa diciutkan (ikon saja); pilihan diingat di perangkat ini. */
 function ciutkanSidebar(paksa) {
   const mini = typeof paksa === 'boolean' ? paksa : !document.body.classList.contains('sidebar-mini');
@@ -547,9 +559,6 @@ function tandaiNavBawah_(sectionId) {
   document.querySelectorAll('#bottomNav [data-nav]').forEach(b => b.classList.toggle('active', b.dataset.nav === aktif));
 }
 function bukaLainnya() {
-  document.getElementById('moreNama').textContent = document.getElementById('userMiniName').textContent;
-  document.getElementById('moreRole').textContent = document.getElementById('userMiniRole').textContent;
-  document.getElementById('moreAvatar').textContent = document.getElementById('userAvatarInitial').textContent;
   document.getElementById('moreAdmin').style.display = isAdmin() ? '' : 'none';
   document.getElementById('moreDark').checked = document.documentElement.getAttribute('data-theme') === 'dark';
   document.getElementById('moreSheet').classList.add('show');
@@ -727,7 +736,7 @@ function statusBadgeClass(status) {
   const map = {
     'Selesai': 'badge-selesai', 'Diproses': 'badge-diproses', 'Pending': 'badge-pending',
     'Ditolak': 'badge-ditolak', 'Antre': 'badge-antre', 'Menunggu': 'badge-menunggu',
-    'Di Loket': 'badge-diloket', 'Terlewat': 'badge-terlewat', 'Proses': 'badge-proses'
+    'Di Loket': 'badge-diloket', 'Terlewat': 'badge-terlewat', 'Proses': 'badge-proses', 'Dilanjutkan': 'badge-dilanjutkan'
   };
   return map[status] || 'badge-netral';
 }
@@ -1041,10 +1050,13 @@ function foStatusInfo(r) {
   if (r.LayananStatus === 'Diproses') return { label: 'Proses', cls: 'badge-proses' };
   if (r.LayananStatus === 'Pending') return { label: 'Pending', cls: 'badge-pending' };
   if (r.LayananStatus === 'Selesai') return { label: 'Selesai', cls: 'badge-selesai' };
+  if (r.LayananStatus === 'Dilanjutkan') return { label: 'Dilanjutkan', cls: 'badge-dilanjutkan' }; // v6.4: pending lama digabung ke layanan baru
   return { label: r.Status || '-', cls: 'badge-netral' };
 }
 
-function katalogById(id) { return (window.AppState.katalog || []).find(k => k.ID === id) || null; }
+/** v6.4: layanan "Lain-lain" — nama layanan diisi sendiri; selesai di Front Office (model Langsung). */
+const KATALOG_LAIN = { ID: '__LAIN__', Kategori: 'Layanan Lain-lain', NamaLayanan: 'Lain-lain', ModelHasil: 'Langsung', PersyaratanJSON: '', FieldJSON: '' };
+function katalogById(id) { return id === KATALOG_LAIN.ID ? KATALOG_LAIN : ((window.AppState.katalog || []).find(k => k.ID === id) || null); }
 function kategoriOf(row) {
   const k = katalogById(row.KatalogID) || (window.AppState.katalog || []).find(x => x.NamaLayanan === (row.LayananNama || row.JenisLayanan));
   return k ? k.Kategori : '';
@@ -1105,7 +1117,7 @@ function renderFoFilterBar() {
         <select class="form-select form-select-sm" onchange="foFilter.kategori=this.value;foFilter.layanan='';renderFoFilterBar();renderFoTable()"><option value="">Semua kategori</option>${o.kats}</select></div>
       <div class="col-6 col-md-2"><label class="form-label">Layanan</label>
         <select class="form-select form-select-sm" onchange="foFilter.layanan=this.value;renderFoTable()"><option value="">Semua layanan</option>${o.lays}</select></div>
-      <div class="col-6 col-md-1"><label class="form-label">Sumber</label>
+      <div class="col-6 col-md-2"><label class="form-label">Sumber</label>
         <select class="form-select form-select-sm" onchange="foFilter.sumber=this.value;renderFoTable()">
           ${['', 'Loket', 'Online'].map(s => `<option value="${s}" ${s === f.sumber ? 'selected' : ''}>${s || 'Semua'}</option>`).join('')}
         </select></div>
@@ -1198,6 +1210,8 @@ function renderFoTable() {
             if (waiting) aksi += `<button class="btn btn-labuku-accent btn-sm-pill" onclick="openVerifikasiPanel('${r.LayananID}')"><i class="bi bi-clipboard-check"></i> Verifikasi</button>`;
             if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Kirim nomor antrean via WhatsApp" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i></button>`;
             if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
+            // v6.4: sudah diverifikasi (Proses/Pending/Selesai) → menu Detail
+            if (!waiting && r.Status !== 'Terlewat' && r.LayananID) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${r.LayananID}')"><i class="bi bi-eye"></i> Detail</button>`;
           }
           return `
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
@@ -1339,14 +1353,17 @@ function katalogSorted() {
 
 /* v4: semua layanan tampil per kategori (klik untuk membuka), tetap bisa dicari; paling sering dipakai di atas. */
 const layananPickers = {};
-function layananPickerHtml(prefix, selectedId) {
+const NAMA_PILIH_LAIN = 'Lain-lain (tulis sendiri)';
+function layananPickerHtml(prefix, selectedId, lainTeks) {
   const sel = katalogById(selectedId);
+  const lain = sel && sel.ID === KATALOG_LAIN.ID;
   return `
     <input type="hidden" id="${prefix}Katalog" value="${sel ? sel.ID : ''}">
     <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="Cari layanan..."
-      value="${sel ? escapeHtml(sel.NamaLayanan) : ''}" oninput="document.getElementById('${prefix}Katalog').value='';renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
+      value="${sel ? escapeHtml(lain ? NAMA_PILIH_LAIN : sel.NamaLayanan) : ''}" oninput="document.getElementById('${prefix}Katalog').value='';document.getElementById('${prefix}Lain').style.display='none';renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
     <div class="lpx-box" id="${prefix}List" style="display:none;"></div>
-    <div class="small text-secondary mt-1" id="${prefix}Info">${sel ? 'Dipilih: ' + escapeHtml(sel.NamaLayanan) : ''}</div>`;
+    <div class="small text-secondary mt-1" id="${prefix}Info">${sel ? 'Dipilih: ' + escapeHtml(lain ? NAMA_PILIH_LAIN : sel.NamaLayanan) : ''}</div>
+    <input class="form-control lain-input" id="${prefix}Lain" maxlength="80" placeholder="Tulis layanan yang dibutuhkan" value="${escapeHtml(lainTeks || '')}"${prefix === 'ta' ? ' oninput="infoLanjutan_()"' : ''} style="${lain ? '' : 'display:none;'}">`;
 }
 
 function renderLayananPicker(prefix) {
@@ -1354,7 +1371,8 @@ function renderLayananPicker(prefix) {
   if (!box) return;
   let p = layananPickers[prefix];
   if (!p || p.box !== box) {
-    p = { box: box, opts: { items: [], kategori: KATEGORI_LAYANAN_RESMI, onPick: it => pilihLayananPicker(prefix, it.id) } };
+    p = { box: box, opts: { items: [], kategori: KATEGORI_LAYANAN_RESMI, onPick: it => pilihLayananPicker(prefix, it.id),
+      lain: { id: KATALOG_LAIN.ID, nama: NAMA_PILIH_LAIN, kategori: KATALOG_LAIN.Kategori, pakai: 0 } } };
     p.ui = LabukuUI.LayananList(box, p.opts);
     layananPickers[prefix] = p;
   }
@@ -1366,10 +1384,14 @@ function renderLayananPicker(prefix) {
 function pilihLayananPicker(prefix, id) {
   const k = katalogById(id);
   if (!k) return;
+  const lain = k.ID === KATALOG_LAIN.ID;
   document.getElementById(prefix + 'Katalog').value = k.ID;
-  document.getElementById(prefix + 'Cari').value = k.NamaLayanan;
-  document.getElementById(prefix + 'Info').textContent = 'Dipilih: ' + k.NamaLayanan;
+  document.getElementById(prefix + 'Cari').value = lain ? NAMA_PILIH_LAIN : k.NamaLayanan;
+  document.getElementById(prefix + 'Info').textContent = 'Dipilih: ' + (lain ? NAMA_PILIH_LAIN : k.NamaLayanan);
   document.getElementById(prefix + 'List').style.display = 'none';
+  const inp = document.getElementById(prefix + 'Lain');
+  if (inp) { inp.style.display = lain ? '' : 'none'; if (lain) setTimeout(() => inp.focus(), 30); }
+  if (prefix === 'ta') infoLanjutan_();
 }
 
 /* Wilayah adaptif (v5: luar kabupaten utama diketik, tanpa memuat data dari server). */
@@ -1379,9 +1401,9 @@ let taWil = null;
 function openTambahAntrean(prefill) {
   const p = prefill || {};
   nikDicek = ''; // v6.3: NIK yang sama di form baru tetap dicek ulang
+  window._pendingNik = p.pendingNik || [];
   openFormModal('Tambah Antrean', `
     <form id="taForm" onsubmit="event.preventDefault(); submitTambahAntrean();">
-      <input type="hidden" id="taLanjut" value=""><input type="hidden" id="taBaru" value="">
       <div id="taLanjutInfo"></div>
       <div class="row g-3">
         <div class="col-md-6"><label class="form-label">NIK <span id="taNikInfo" class="nik-info"></span></label><input class="form-control" id="taNik" maxlength="16" inputmode="numeric" value="${escapeHtml(p.nik || '')}" oninput="cekNikTambah(this.value)"></div>
@@ -1389,7 +1411,7 @@ function openTambahAntrean(prefill) {
         <div class="col-md-6"><label class="form-label">Nomor WhatsApp</label><input class="form-control" id="taHp" inputmode="tel" placeholder="08xxxxxxxxxx" required value="${escapeHtml(p.noHp || '')}"></div>
         <div class="col-12"><label class="form-label">Alamat</label><div id="taWilayah"></div>
           <input class="form-control mt-2" id="taAlamat" maxlength="120" placeholder="Dusun / RT / RW (opsional)" value="${escapeHtml(p.alamat || '')}"></div>
-        <div class="col-12"><label class="form-label">Layanan</label>${layananPickerHtml('ta', p.katalogId)}</div>
+        <div class="col-12"><label class="form-label">Layanan</label>${layananPickerHtml('ta', p.katalogId, p.layananLain)}</div>
       </div>
       <button type="submit" class="btn btn-labuku-primary w-100 mt-4"><i class="bi bi-ticket-perforated"></i> Terbitkan Nomor Antrean</button>
     </form>`);
@@ -1402,17 +1424,19 @@ function openTambahAntrean(prefill) {
     wilBox.innerHTML = '<div class="small text-danger">Data wilayah belum dimuat. Klik tombol Refresh di kanan atas.</div>';
   }
   if (!p.katalogId) renderLayananPicker('ta');
+  infoLanjutan_();
 }
 
 /*
  * v6.2: NIK 16 digit → dicek ke data pemohon lama. Bila ada: isian terisi otomatis + pemberitahuan.
- * Layanan PENDING untuk jenis yang sama otomatis dilanjutkan oleh server (ID layanan tetap).
+ * v6.4: punya layanan PENDING → jenis layanan terisi otomatis + pop-up kekurangan & keterangan dulu.
+ *       Server menggabungkan pending berjenis SAMA ke layanan baru (checklist, kekurangan, keterangan dibawa).
  */
 let nikDicek = '';
 function cekNikTambah(nilai) {
   const nik = String(nilai || '').replace(/\D/g, '');
   const info = document.getElementById('taNikInfo');
-  if (nik !== nikDicek) setPilihanPending('', false);
+  if (nik !== nikDicek) { window._pendingNik = []; infoLanjutan_(); }
   if (nik.length !== 16) { nikDicek = ''; if (info) info.textContent = ''; return; }
   if (nik === nikDicek) return;
   nikDicek = nik;
@@ -1432,56 +1456,47 @@ function cekNikTambah(nilai) {
   }, () => { if (info) info.textContent = ''; }).cekPemohonNik(nik);
 }
 
-/*
- * v6.3: pengunjung lama dengan layanan PENDING — tampilkan kekurangan & keterangan,
- * petugas memilih: lanjutkan (ID lama) atau daftar layanan baru (ID baru).
- */
+/* v6.4: pop-up pemberitahuan saja — kekurangan & keterangan dulu; jenis layanan pending terbaru langsung terpilih. */
 function popupPending(d) {
   const body = document.getElementById('formModalBody');
   if (!body) return;
   const lama = document.getElementById('popupLama');
   if (lama) lama.remove();
-  window._pendingNik = d.pending;
+  window._pendingNik = d.pending || [];
+  const p0 = window._pendingNik[0];
+  if (p0 && katalogById(p0.katalogId)) {
+    pilihLayananPicker('ta', p0.katalogId);
+    if (p0.katalogId === KATALOG_LAIN.ID) { const inp = document.getElementById('taLain'); if (inp) inp.value = p0.jenis || ''; }
+  }
+  infoLanjutan_();
   const el = document.createElement('div');
   el.id = 'popupLama';
   el.className = 'popup-lama';
   el.innerHTML = `<div class="popup-lama-kartu popup-pending" role="alertdialog" aria-live="assertive">
-      <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-hourglass-split text-warning"></i><div class="fw-bold">Ada layanan pending</div></div>
-      <div class="small text-secondary mb-3 text-start">${escapeHtml(d.nama || '')}</div>
-      ${d.pending.map((p, i) => `
+      <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-hourglass-split text-warning"></i><div class="fw-bold">Layanan pending sebelumnya</div></div>
+      <div class="small text-secondary mb-2 text-start">${escapeHtml(d.nama || '')}</div>
+      ${window._pendingNik.map(p => `
         <div class="pending-item text-start">
           <div class="fw-semibold">${escapeHtml(p.jenis)}</div>
           <div class="small text-secondary mb-1">${escapeHtml(p.id)} · ${fmtDate(p.tanggal)}</div>
-          ${p.kekurangan && p.kekurangan.length ? `<div class="small"><span class="text-secondary">Kekurangan:</span><ul class="mb-1 ps-3">${p.kekurangan.map(k => `<li>${escapeHtml(k)}</li>`).join('')}</ul></div>` : ''}
-          ${p.keterangan ? `<div class="small mb-2"><span class="text-secondary">Keterangan:</span> ${escapeHtml(p.keterangan)}</div>` : ''}
-          <button type="button" class="btn btn-labuku-primary w-100 btn-lanjut-pending" onclick="pilihPending(${i})"><i class="bi bi-arrow-repeat"></i> Lanjutkan layanan ini</button>
+          ${p.kekurangan && p.kekurangan.length ? `<div class="small"><span class="text-secondary">Kekurangan dulu:</span><ul class="mb-1 ps-3">${p.kekurangan.map(k => `<li>${escapeHtml(k)}</li>`).join('')}</ul></div>` : ''}
+          ${p.keterangan ? `<div class="small"><span class="text-secondary">Keterangan:</span> ${escapeHtml(p.keterangan)}</div>` : ''}
         </div>`).join('')}
-      <button type="button" class="btn btn-labuku-outline w-100 mt-2" id="popupBaruBtn" onclick="pilihLayananBaru()">Daftar layanan baru</button>
+      <div class="small text-secondary text-start mt-2">Layanan baru dengan jenis yang sama otomatis melanjutkan data di atas.</div>
+      <button type="button" class="btn btn-labuku-primary w-100 mt-3" id="popupLamaYa" onclick="document.getElementById('popupLama').remove()">Ya</button>
     </div>`;
   body.appendChild(el);
-  setTimeout(() => { const b = el.querySelector('.btn-lanjut-pending'); if (b) b.focus(); }, 30);
+  setTimeout(() => { const b = document.getElementById('popupLamaYa'); if (b) b.focus(); }, 30);
 }
 
-function setPilihanPending(id, baru) {
-  const l = document.getElementById('taLanjut'), b = document.getElementById('taBaru'), info = document.getElementById('taLanjutInfo');
-  if (l) l.value = id || '';
-  if (b) b.value = baru ? '1' : '';
-  if (info) info.innerHTML = id ? `<div class="lanjut-info mb-3"><i class="bi bi-arrow-repeat"></i> Melanjutkan <b>${escapeHtml(id)}</b> <a href="javascript:void(0)" onclick="setPilihanPending('',true)">batal</a></div>` : '';
-}
-
-function pilihPending(i) {
-  const p = (window._pendingNik || [])[i];
-  const pop = document.getElementById('popupLama');
-  if (pop) pop.remove();
-  if (!p) return;
-  setPilihanPending(p.id, false);
-  if (katalogById(p.katalogId)) pilihLayananPicker('ta', p.katalogId);
-}
-
-function pilihLayananBaru() {
-  const pop = document.getElementById('popupLama');
-  if (pop) pop.remove();
-  setPilihanPending('', true);
+/* v6.4: keterangan di atas form — layanan terpilih sama dengan pending → "Lanjutan LYN-…" + kekurangan dulu. */
+function infoLanjutan_() {
+  const box = document.getElementById('taLanjutInfo');
+  if (!box) return;
+  const kat = (document.getElementById('taKatalog') || {}).value || '';
+  const lainTeks = String((document.getElementById('taLain') || {}).value || '').trim().toLowerCase();
+  const p = (window._pendingNik || []).find(x => x.katalogId === kat && (kat !== KATALOG_LAIN.ID || String(x.jenis).trim().toLowerCase() === lainTeks));
+  box.innerHTML = p ? `<div class="lanjut-info mb-3"><i class="bi bi-arrow-repeat"></i> Melanjutkan pending <b>${escapeHtml(p.id)}</b>${p.kekurangan && p.kekurangan.length ? ' · kekurangan dulu: ' + escapeHtml(p.kekurangan.join(', ')) : ''}${p.keterangan ? '<div class="small mt-1">Keterangan: ' + escapeHtml(p.keterangan) + '</div>' : ''}</div>` : '';
 }
 
 function popupPengunjungLama(nama) {
@@ -1509,8 +1524,6 @@ function submitTambahAntrean() {
     nik: document.getElementById('taNik').value.replace(/\D/g, ''),
     nama: namaKapital(document.getElementById('taNama').value),
     noHp: document.getElementById('taHp').value.trim(),
-    lanjutLayananId: (document.getElementById('taLanjut') || {}).value || '',
-    layananBaru: !!((document.getElementById('taBaru') || {}).value),
     alamat: document.getElementById('taAlamat').value.trim(),
     katalogId: document.getElementById('taKatalog').value
   };
@@ -1518,12 +1531,16 @@ function submitTambahAntrean() {
   if (!wil.ok) { showToast('Peringatan', wil.error, 'warning'); return; }
   data.wilayah = wil.data;
   if (!data.katalogId) { showToast('Peringatan', 'Pilih layanan dari daftar.', 'warning'); renderLayananPicker('ta'); return; }
-  lastTambahData = Object.assign({}, data, { wilayahState: taWil.getState() });
+  if (data.katalogId === KATALOG_LAIN.ID) {
+    data.layananLain = String(document.getElementById('taLain').value || '').replace(/\s+/g, ' ').trim();
+    if (data.layananLain.length < 3) { showToast('Peringatan', 'Tuliskan layanan yang dibutuhkan (Lain-lain).', 'warning'); document.getElementById('taLain').focus(); return; }
+  }
+  lastTambahData = Object.assign({}, data, { wilayahState: taWil.getState(), pendingNik: window._pendingNik || [] });
   closeFormModal();
 
   const kat = katalogById(data.katalogId);
   if (kat) kat.Pemakaian = (Number(kat.Pemakaian) || 0) + 1;
-  const temp = { ID: 'tmp-' + Date.now(), _temp: true, Nomor: '…', PemohonNama: data.nama, LayananNama: kat ? kat.NamaLayanan : '', LayananID: '', KatalogID: data.katalogId,
+  const temp = { ID: 'tmp-' + Date.now(), _temp: true, Nomor: '…', PemohonNama: data.nama, LayananNama: data.layananLain || (kat ? kat.NamaLayanan : ''), LayananID: '', KatalogID: data.katalogId,
     Status: 'Menunggu', LayananStatus: 'Antre', NoHP: data.noHp, Sumber: 'Loket', Waktu: new Date().toISOString() };
   window.AppState.fo.push(temp);
   pendingStart();
@@ -1540,6 +1557,10 @@ function submitTambahAntrean() {
       return;
     }
     window.AppState.fo.push(res.data);
+    if (res.data.LanjutanDari) { // v6.4: pending lama → "Dilanjutkan"
+      window.AppState.fo.forEach(x => { if (x.LayananID === res.data.LanjutanDari) x.LayananStatus = 'Dilanjutkan'; });
+      showToast('Lanjutan', res.message || ('Melanjutkan ' + res.data.LanjutanDari), 'info');
+    }
     renderFoTable(); saveFoToCache();
     showAntreanDibuat(res.data);
   }, function (err) {
@@ -1641,6 +1662,10 @@ function renderVerifikasiPanel(res, layananId) {
       </div>
       <span class="badge-status badge-netral align-self-start" id="verifCount"></span>
     </div>
+    ${layanan.LanjutanDari ? `<div class="ket-box mb-3"><i class="bi bi-arrow-repeat"></i><div>
+      <div class="fw-semibold">Lanjutan pending ${escapeHtml(layanan.LanjutanDari)}</div>
+      ${String(layanan.CatatanPending || '').trim() ? `<div class="small">Catatan dulu: ${escapeHtml(layanan.CatatanPending)}</div>` : ''}
+      <div class="small text-secondary">Butir yang dulu sudah lengkap otomatis tercentang.</div></div></div>` : ''}
 
     <h6 class="fw-bold mb-1">Berkas Persyaratan</h6>
     ${persyaratan.length === 0 ? '<p class="text-secondary small">Checklist berkas layanan ini belum diatur di Katalog. Periksa berkas secara manual.</p>' : `
@@ -1948,7 +1973,7 @@ function renderServiceWorkspace(res, layananId, initialTab) {
         <div class="small text-secondary">${escapeHtml(namaKapital(d.layanan.PemohonNama))}${d.pemohon && d.pemohon.NoHP ? ' · ' + escapeHtml(d.pemohon.NoHP) : ''}</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
-        <button class="btn btn-labuku-outline btn-sm-pill" id="wsPetunjukBtn" onclick="bukaPetunjuk()"><i class="bi bi-journal-text"></i> Petunjuk</button>
+        <button class="btn btn-labuku-accent btn-petunjuk" id="wsPetunjukBtn" onclick="bukaPetunjuk()"><i class="bi bi-journal-text"></i> Petunjuk Teknis</button>
         <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span>
         <span class="badge-status ${(BO_TAHAP[tahap] || BO_TAHAP.Isian).cls}">${tahap}</span>
       </div>
@@ -2083,7 +2108,7 @@ function inputFieldHtml(f, i, nilai, terkunci) {
 function buildWorkspaceIsianTab(d) {
   const specs = d.fieldSpecs || (d.fields || []).map(n => ({ nama: n, jenis: 'teks', lebar: 'penuh' }));
   const isian = d.isian || {};
-  const auto = d.autoData || {};
+  const auto = d.autoData || {}; // v6.4: tetap dipakai diam-diam untuk isi awal & PDF, tidak ditampilkan
   const arsip = d.model === 'Arsip';
   const drafts = dokumenByKategori(d, arsip ? 'Arsip' : 'Draft');
   const selesai = d.layanan.Status === 'Selesai';
@@ -2091,9 +2116,10 @@ function buildWorkspaceIsianTab(d) {
     <div class="row g-3">
       <div class="col-xl-8">
         <div class="lb-card mb-3">
-          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+          <div class="ws-isian-head">
             <h6 class="fw-bold mb-0">Isian Data</h6>
-            <span class="small ${d.template ? 'text-secondary' : 'text-danger'}">${d.template ? '<i class="bi bi-file-earmark-text"></i> ' + escapeHtml(d.template.NamaDokumen) : 'Template belum ada — PDF berupa ringkasan'}</span>
+            <button type="button" class="btn btn-labuku-outline btn-edit-template" id="wsTemplateBtn" onclick="editTemplate()" title="${d.template ? escapeHtml(d.template.NamaDokumen) : 'Template belum ada — dibuat otomatis'}">
+              <i class="bi bi-pencil-square"></i> ${d.template ? 'Edit Template' : 'Buat Template'}</button>
           </div>
           ${specs.length === 0 ? '<p class="small text-secondary">Field belum diatur di Katalog Layanan.</p>' : ''}
           <form id="isianForm" onsubmit="event.preventDefault(); simpanIsianPdf();">
@@ -2103,19 +2129,16 @@ function buildWorkspaceIsianTab(d) {
                 return `<div class="${LEBAR_KOLOM[f.lebar] || 'col-12'}"><label class="form-label d-flex justify-content-between align-items-center gap-2" for="isian_${i}">${escapeHtml(f.nama)} ${chipSalin(f.nama)}</label>${inputFieldHtml(f, i, nilai, selesai)}</div>`;
               }).join('')}
             </div>
-            <details class="mt-3 mb-3"><summary class="small fw-semibold">Data otomatis</summary>
-              <div class="small mt-2">${Object.keys(auto).map(k => `<div class="mb-1">${chipSalin(k)} = ${escapeHtml(auto[k] || '-')}</div>`).join('')}</div>
-            </details>
-            ${selesai ? '' : `<button type="submit" class="btn btn-labuku-primary w-100" id="isianBtn"><i class="bi bi-file-earmark-pdf"></i> Simpan &amp; Buat PDF</button>`}
+            ${selesai ? '' : `<button type="submit" class="btn btn-labuku-primary w-100 mt-4" id="isianBtn"><i class="bi bi-file-earmark-pdf"></i> Simpan &amp; Buat PDF</button>`}
           </form>
         </div>
-      </div>
-      <div class="col-xl-4">
         <div class="lb-card mb-3">
           <h6 class="fw-bold mb-2">${arsip ? 'PDF Arsip' : 'PDF Draft'}</h6>
           ${dokumenListHtml(drafts, 'Belum ada PDF.')}
           ${drafts.length && !selesai && !arsip ? '<button class="btn btn-labuku-outline w-100 mt-3" onclick="switchWorkspaceTab(&#39;tte&#39;)">Unggah TTE <i class="bi bi-arrow-right"></i></button>' : ''}
         </div>
+      </div>
+      <div class="col-xl-4">
         ${arsip ? kartuSelesaiHtml(d, { siap: drafts.length > 0 || specs.length === 0, syarat: 'Buat PDF arsip dulu.' }) : ''}
         <div class="lb-card">
           <h6 class="fw-bold mb-3">Log Aktivitas</h6>
@@ -2126,6 +2149,41 @@ function buildWorkspaceIsianTab(d) {
         </div>
       </div>
     </div>`;
+}
+
+/*
+ * v6.4: "Edit Template" — Google Doc template layanan ini terbuka di tab baru, siap diedit.
+ * Belum ada → dibuat otomatis (judul + {{Field}}) dan dicatat di Katalog. Dokumen dibagikan
+ * "Siapa saja yang memiliki link: Editor", jadi bisa diedit dari akun Google mana pun.
+ * Yang diedit adalah dokumen yang SAMA dengan di Katalog, jadi PDF berikutnya ikut berubah.
+ */
+function editTemplate() {
+  const d = window._wsData;
+  if (!d || !d.layanan) return;
+  const btn = document.getElementById('wsTemplateBtn');
+  const asli = btn ? btn.innerHTML : '';
+  // jendela dibuka saat klik (sinkron) agar tidak diblokir browser; alamatnya diisi setelah server menjawab
+  let w = null;
+  try { w = window.open('', '_blank'); if (w) w.document.write('<p style="font-family:sans-serif;padding:2rem;color:#475569">Membuka template...</p>'); } catch (e) {}
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-border spinner-border-sm"></span> Membuka...'; }
+  const selesai = () => { if (btn) { btn.disabled = false; btn.innerHTML = asli; } };
+  gsr(res => {
+    selesai();
+    if (!res || !res.success) { if (w) try { w.close(); } catch (e) {} showToast('Gagal', (res && res.message) || 'Template tidak dapat dibuka.', 'danger'); return; }
+    const url = res.data.url;
+    if (w && !w.closed) { try { w.opener = null; w.location.href = url; } catch (e) { window.open(url, '_blank', 'noopener'); } }
+    else window.open(url, '_blank', 'noopener');
+    if (res.data.baru && res.data.dokumen) {
+      d.template = res.data.dokumen;
+      const kl = katalogLengkap();
+      if (kl && Array.isArray(kl.knowledge)) kl.knowledge.push(res.data.dokumen);
+      if (btn) btn.innerHTML = '<i class="bi bi-pencil-square"></i> Edit Template';
+      showToast('Template dibuat', 'Template baru dibuat, tersimpan di Katalog Layanan, dan dibuka di tab baru.', 'success');
+    }
+    if (res.data.dibagikan === false) {
+      showToast('Perhatian', 'Template dibuka, tetapi izin berbagi tidak dapat diubah (dokumen milik akun lain). Minta pemiliknya membagikan "Siapa saja yang memiliki link: Editor".', 'warning');
+    }
+  }, err => { selesai(); if (w) try { w.close(); } catch (e) {} showToast('Error', err.message || err, 'danger'); }).bukaTemplate(d.layanan.KatalogID);
 }
 
 /** v6.2: kartu penyelesaian — selesai SELALU disertai WA (opsi tanpa WA dihapus). */
@@ -2621,8 +2679,7 @@ function renderKnowledgeLayanan(katalogId) {
         <div class="col-md-6"><div class="fw-semibold small mb-1">Persyaratan</div>
           ${persyaratan.length ? '<ol class="small mb-0 ps-3">' + persyaratan.map(p => `<li>${escapeHtml(p)}</li>`).join('') + '</ol>' : '<div class="small text-secondary">Belum diatur.</div>'}</div>
         <div class="col-md-6"><div class="fw-semibold small mb-1">Field isian <span class="fw-normal text-secondary">— klik untuk menyalin</span></div>
-          ${model === 'Langsung' ? '<div class="small text-secondary">Tidak dipakai (model Langsung).</div>' : fields.length ? '<div class="small">' + fields.map(f => chipSalin(f)).join(' ') + '</div>' : '<div class="small text-secondary">Belum diatur.</div>'}
-          ${model === 'Langsung' ? '' : `<details class="mt-2"><summary class="small text-secondary">Data otomatis</summary><div class="small mt-1">${DATA_OTOMATIS.map(f => chipSalin(f)).join(' ')}</div></details>`}</div>
+          ${model === 'Langsung' ? '<div class="small text-secondary">Tidak dipakai (model Langsung).</div>' : fields.length ? '<div class="small">' + fields.map(f => chipSalin(f)).join(' ') + '</div>' : '<div class="small text-secondary">Belum diatur.</div>'}</div>
       </div>
     </div>
     ${kartu('SOP', sopReg('SOP'), '', 'Dipasang per kategori — kelola di ' + kategoriLink + '.')}
@@ -2711,8 +2768,7 @@ function openKatalogForm(katalog, kategoriDefault) {
       <div class="col-12"><label class="form-label">Field isian</label>
         <div class="fb-list" id="fbList"></div>
         <button type="button" class="btn btn-labuku-outline btn-sm-pill mt-2" onclick="fbTambah()"><i class="bi bi-plus-lg"></i> Tambah field</button>
-        <div class="fb-pratinjau mt-2" id="fbPratinjau"></div>
-        <details class="mt-2"><summary class="small text-secondary">Data otomatis</summary><div class="small mt-1">${DATA_OTOMATIS.map(f => chipSalin(f)).join(' ')}</div></details></div>
+        <div class="fb-pratinjau mt-2" id="fbPratinjau"></div></div>
       <div class="col-12"><label class="form-label">Petunjuk Teknis</label><textarea class="form-control" id="katFormJuknis" rows="5" placeholder="Baris diawali # = judul, - = butir.">${escapeHtml(katalog.Juknis || '')}</textarea></div>
       <div class="col-md-6"><label class="form-label">Status</label>
         <select class="form-select" id="katFormAktif"><option value="Ya" ${katalog.Aktif !== 'Tidak' ? 'selected' : ''}>Aktif</option><option value="Tidak" ${katalog.Aktif === 'Tidak' ? 'selected' : ''}>Nonaktif</option></select>
@@ -3159,10 +3215,11 @@ const WA_TPL_INFO = [
   ['wa_pending', 'Pending (persyaratan kurang)', '{kekurangan} = persyaratan yang belum dicentang + catatan.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'kekurangan']],
   ['wa_tte', 'Selesai — TTE', 'Berisi tautan PDF ber-TTE.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link', 'keterangan']],
   ['wa_arsip', 'Selesai — Arsip (tanpa TTE)', 'Pemberitahuan selesai, tanpa PDF.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'keterangan']],
-  ['wa_langsung', 'Selesai — di Front Office', 'Dikirim dari verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'keterangan']]
+  ['wa_langsung', 'Selesai — di Front Office', 'Dikirim dari verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'keterangan']],
+  ['wa_kua', 'Pengunjung → WA KUA', 'Dikirim PENGUNJUNG ke nomor WA KUA (Pengaturan → Umum) setelah mendaftar di form antrean publik.', ['nama', 'nomor', 'layanan', 'instansi', 'tanggal', 'hp']]
 ];
 const WA_CONTOH = {
-  nama: 'Ahmad Hidayat', nomor: 'A-007', layanan: 'Legalisasi Buku Nikah', id: 'LYN-2026-00042', tanggal: 'Kamis, 08 Oktober 2026', sisa: 2,
+  nama: 'Ahmad Hidayat', nomor: 'A-007', hp: '081234567890', layanan: 'Legalisasi Buku Nikah', id: 'LYN-2026-00042', tanggal: 'Kamis, 08 Oktober 2026', sisa: 2,
   keterangan: String.fromCharCode(10) + 'Keterangan: Mohon bawa KTP asli saat pengambilan.',
   posisi: 'Saat ini ada 2 antrean sebelum Anda.', kekurangan: '- Fotokopi KK' + String.fromCharCode(10) + '- Pas foto 2x3', link: 'https:' + String.fromCharCode(47, 47) + 'drive.google.com/file/d/contoh/view'
 };
@@ -3240,13 +3297,16 @@ function loadManajemenPengaturan() {
     <div class="lb-card" style="max-width:560px;">
       <h6 class="fw-bold mb-3">Identitas Aplikasi</h6>
       <div class="mb-3"><label class="form-label">Nama Aplikasi</label>
-        <div class="form-control bg-transparent" style="opacity:.85;">LABUKU Desk — Layanan dan Pembukuan KUA</div>
+        <div class="form-control bg-transparent" style="opacity:.85;">LABUKU Desk — Layanan Administrasi dan Pembukuan KUA</div>
 </div>
       <div class="mb-3"><label class="form-label">Nama Instansi <span class="text-secondary fw-normal">(tampil di sidebar, form publik, dan pesan WA)</span></label><input type="text" class="form-control" id="setInstansi" value="${escapeHtml(c.instansi || '')}"></div>
       <div class="mb-3"><label class="form-label">Kecamatan utama form antrean</label>
         ${home ? `<select class="form-select" id="setWilayahUtama">${home.kec.map(k => `<option value="${k[0]}" ${k[0] === utama ? 'selected' : ''}>Kec. ${escapeHtml(k[1])}</option>`).join('')}</select>
         <div class="small text-secondary mt-1">${escapeHtml(home.kab[1])}, ${escapeHtml(home.prov[1])}. Pengunjung dari kecamatan ini cukup memilih desa.</div>`
         : '<div class="small text-danger">Data wilayah belum dimuat. Klik Refresh.</div>'}</div>
+      <div class="mb-3"><label class="form-label">Nomor WhatsApp KUA <span class="text-secondary fw-normal">(menerima pemberitahuan dari form antrean publik)</span></label>
+        <input type="tel" class="form-control" id="setWaKua" inputmode="tel" placeholder="08xxxxxxxxxx" value="${escapeHtml(c.waKua || '')}">
+        <div class="small text-secondary mt-1">Setelah pengunjung mengambil nomor antrean online, WhatsApp-nya langsung terbuka ke nomor ini. Kosongkan untuk mematikan. Isi pesan: Pengaturan → Template WA → "Pengunjung → WA KUA".</div></div>
 
       <button class="btn btn-labuku-primary" onclick="submitPengaturan()"><i class="bi bi-save"></i> Simpan Pengaturan</button>
     </div>
@@ -3262,6 +3322,9 @@ function loadManajemenPengaturan() {
 
 function submitPengaturan() {
   const obj = { instansi: document.getElementById('setInstansi').value.trim() };
+  const waKua = document.getElementById('setWaKua').value.replace(/[^\d+]/g, '');
+  if (waKua && !/^(\+?62|0)8\d{7,12}$/.test(waKua)) { showToast('Peringatan', 'Nomor WhatsApp KUA tidak valid (contoh: 081234567890).', 'warning'); return; }
+  obj.waKua = waKua;
   const wSel = document.getElementById('setWilayahUtama');
   const wilayahBerubah = !!(wSel && wSel.value && wSel.value !== window.AppState.config.wilayahUtama);
   if (wSel && wSel.value) obj.wilayahUtama = wSel.value;

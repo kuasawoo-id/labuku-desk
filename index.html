@@ -3,7 +3,7 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
-  <title>LABUKU Desk — Layanan dan Pembukuan KUA</title>
+  <title>LABUKU Desk — Layanan Administrasi dan Pembukuan KUA</title>
 
   <!-- Penjaga "hanya berputar": bila JavaScript utama gagal di-parse (SyntaxError),
        tampilkan pesan di layar alih-alih spinner tanpa akhir. -->
@@ -62,7 +62,7 @@
   <div id="authScreen" class="auth-screen" style="display:none;">
     <div class="auth-card">
       <h4 class="auth-brand">LABUKU DESK <span class="small">by Ahzani Labs</span></h4>
-      <p class="auth-tagline">Layanan dan Pembukuan KUA</p>
+      <p class="auth-tagline">Layanan Administrasi dan Pembukuan KUA</p>
       <p class="auth-sub" id="authInstansi">KUA</p>
 
       <div id="authActivate" style="display:none;">
@@ -92,10 +92,11 @@
     <div class="sidebar-header">
       <button type="button" class="sidebar-ciut" id="sidebarCiut" onclick="ciutkanSidebar()" title="Ciutkan / lebarkan menu" aria-label="Ciutkan menu"><i class="bi bi-layout-sidebar-inset"></i></button>
       <h4 class="brand-title">LABUKU DESK</h4>
-      <p class="brand-tagline">Layanan dan Pembukuan KUA</p>
+      <p class="brand-tagline">Layanan Administrasi dan Pembukuan KUA</p>
       <p class="brand-sub">by Ahzani Labs</p>
       <p class="brand-instansi" id="sidebarInstansi"></p>
     </div>
+    <div class="sidebar-garis"></div>
     <ul class="sidebar-nav">
       <li><a href="javascript:void(0)" title="Dashboard" onclick="navigateTo('dashboard')" class="nav-link active" data-section="dashboard">
         <i class="bi bi-grid-1x2-fill"></i> <span>Dashboard</span></a></li>
@@ -109,16 +110,10 @@
         <i class="bi bi-gear-fill"></i> <span>Pengaturan</span></a></li>
     </ul>
     <div class="sidebar-footer">
-      <div class="user-mini" id="userMiniBox">
-        <div class="user-avatar" id="userAvatarInitial">A</div>
-        <div class="user-mini-info">
-          <div class="user-mini-name" id="userMiniName">Memuat...</div>
-          <div class="user-mini-role" id="userMiniRole">-</div>
-        </div>
-      </div>
+      <!-- v6.4: nama & peran pindah ke kanan atas (topbar); tombol Ganti nama & Keluar tetap di sini -->
       <div class="user-mini-actions">
-        <button class="btn btn-sm btn-link" onclick="gantiNamaMasuk()" title="Ganti nama"><i class="bi bi-person-badge"></i> <span>Ganti nama</span></button>
-        <button class="btn btn-sm btn-link" onclick="logout()" title="Keluar"><i class="bi bi-box-arrow-right"></i> <span>Keluar</span></button>
+        <button class="btn btn-sidebar-aksi" onclick="gantiNamaMasuk()" title="Ganti nama"><i class="bi bi-person-badge"></i> <span>Ganti nama</span></button>
+        <button class="btn btn-sidebar-aksi keluar" onclick="logout()" title="Keluar"><i class="bi bi-box-arrow-right"></i> <span>Keluar</span></button>
       </div>
     </div>
   </nav>
@@ -143,9 +138,14 @@
       </div>
       <div class="topbar-actions">
         <button class="btn btn-icon" id="topbarRefreshBtn" title="Muat Ulang" onclick="refreshCurrentSection()"><i class="bi bi-arrow-clockwise"></i></button>
-        <button class="btn btn-icon topbar-lebar" title="Kalender"><i class="bi bi-calendar3"></i></button>
-        <button class="btn btn-icon topbar-lebar" title="Notifikasi"><i class="bi bi-bell"></i><span class="dot-badge"></span></button>
-        <div class="topbar-avatar" id="topbarAvatar" onclick="bukaLainnya()">A</div>
+        <button class="btn btn-icon" id="topbarDarkBtn" title="Mode malam" aria-label="Mode malam" onclick="toggleDarkMode()"><i class="bi bi-moon-stars"></i></button>
+        <button type="button" class="topbar-user" id="topbarUser" onclick="gantiNamaMasuk()" title="Ganti nama">
+          <span class="tu-teks">
+            <span class="tu-nama" id="topbarNama">-</span>
+            <span class="tu-role">Masuk sebagai · <span id="topbarRole">-</span></span>
+          </span>
+          <i class="bi bi-chevron-down tu-panah"></i>
+        </button>
       </div>
     </div>
 

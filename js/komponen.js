@@ -167,8 +167,9 @@ window.LabukuUI = (function () {
           var hay = (it.nama + ' ' + it.kategori).toLowerCase();
           return words.every(function (w) { return hay.indexOf(w) !== -1; });
         }).slice(0, 40);
-        if (!hasil.length) { box.appendChild(mk('div', 'lpx-empty', 'Layanan tidak ditemukan.')); return; }
+        if (!hasil.length) box.appendChild(mk('div', 'lpx-empty', 'Layanan tidak ditemukan.'));
         hasil.forEach(function (it) { box.appendChild(itemBtn(it, false)); });
+        tambahLain();
         return;
       }
       var sering = items.filter(function (it) { return it.pakai > 0; }).slice(0, 5);
@@ -176,6 +177,7 @@ window.LabukuUI = (function () {
         box.appendChild(mk('div', 'lpx-head', 'Teratas'));
         sering.forEach(function (it) { box.appendChild(itemBtn(it, false)); });
       }
+      tambahLain(); /* v6.4: langsung terlihat tanpa menggulir */
       box.appendChild(mk('div', 'lpx-head', 'Kategori'));
       (opts.kategori || []).forEach(function (kat) {
         var isi = items.filter(function (it) { return it.kategori === kat; });
@@ -190,6 +192,13 @@ window.LabukuUI = (function () {
         if (openKat === kat) isi.forEach(function (it) { box.appendChild(itemBtn(it, true)); });
       });
       box.scrollTop = st;
+    }
+    /* v6.4: pilihan "Lain-lain (tulis sendiri)" selalu ada (di bawah Teratas, atau di akhir hasil cari) */
+    function tambahLain() {
+      if (!opts.lain) return;
+      var b = itemBtn(opts.lain, false);
+      b.className += ' lpx-lain';
+      box.appendChild(b);
     }
     return { render: render, hide: function () { box.style.display = 'none'; } };
   }

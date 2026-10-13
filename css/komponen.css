@@ -17,3 +17,5 @@
   .lpx-kat { font-weight: 600; }
   .lpx-kat .lpx-n { font-weight: 400; font-size: .75rem; opacity: .6; }
   .lpx-empty { padding: .6rem .75rem; font-size: .85rem; opacity: .7; }
+  .lpx-item.lpx-lain { font-weight: 600; color: #1B4332; }
+  [data-theme="dark"] .lpx-item.lpx-lain { color: #95d5b2; }

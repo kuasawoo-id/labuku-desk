@@ -68,6 +68,7 @@
           <input class="form-control" id="fCari" autocomplete="off" placeholder="Cari layanan...">
           <div class="lpx-box" id="fList"></div>
           <div class="small text-secondary mt-1" id="fInfo"></div>
+          <input class="form-control mt-2" id="fLain" maxlength="80" style="display:none;" placeholder="Tulis layanan yang dibutuhkan">
         </div>
         <div class="hp" aria-hidden="true"><label>Website <input id="fWebsite" tabindex="-1" autocomplete="off"></label></div>
         <div id="fErr" class="err mb-2"></div>
@@ -88,6 +89,7 @@
         </div>
       </div>
       <p class="text-center text-secondary small mt-3">Screenshot layar ini, lalu tunggu panggilan. Bawa berkas persyaratan asli.</p>
+      <a class="btn btn-go w-100 mb-2" id="tWaKua" style="display:none;" href="#"><span id="tWaKuaTeks">Kirim ke WhatsApp KUA</span></a>
       <button class="btn btn-outline-secondary w-100" type="button" onclick="resetForm()">Daftar untuk orang lain</button>
     </div>
   </div>
@@ -116,8 +118,12 @@
       PICKER = LabukuUI.LayananList(el('fList'), {
         items: LAYANAN,
         kategori: (FORM_DATA.groups || []).map(function (g) { return g.kategori; }),
+        lain: { id: '__LAIN__', nama: 'Lain-lain (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 },
         onPick: function (l) {
           el('fLayanan').value = l.id; el('fCari').value = l.nama;
+          /* v6.4: Lain-lain → pemohon menulis sendiri layanan yang dibutuhkan */
+          el('fLain').style.display = l.id === '__LAIN__' ? '' : 'none';
+          if (l.id === '__LAIN__') setTimeout(function () { el('fLain').focus(); }, 30);
           el('fInfo').innerHTML = '';
           var p = document.createElement('span'); p.className = 'pilihan'; p.textContent = 'Dipilih: ' + l.nama;
           el('fInfo').appendChild(p);
@@ -125,7 +131,7 @@
         }
       });
       PICKER.render('');
-      el('fCari').addEventListener('input', function () { el('fLayanan').value = ''; PICKER.render(el('fCari').value); });
+      el('fCari').addEventListener('input', function () { el('fLayanan').value = ''; el('fLain').style.display = 'none'; PICKER.render(el('fCari').value); });
       el('fCari').addEventListener('focus', function () { PICKER.render(el('fLayanan').value ? '' : el('fCari').value); });
       if (FORM_DATA.wilayahHome) {
         WIL = LabukuUI.Wilayah(el('fWilayah'), { home: FORM_DATA.wilayahHome, id: 'fW' });
@@ -146,6 +152,8 @@
       var wil = WIL ? WIL.getValue() : { ok: false, error: 'Data wilayah belum tersedia.' };
       if (!wil.ok) { el('fErr').textContent = wil.error; el('fWilayah').scrollIntoView({ block: 'center' }); return; }
       if (!el('fLayanan').value) { el('fErr').textContent = 'Pilih layanan dari daftar.'; PICKER.render(el('fCari').value); return; }
+      var lain = el('fLain').value.replace(/\s+/g, ' ').trim();
+      if (el('fLayanan').value === '__LAIN__' && lain.length < 3) { el('fErr').textContent = 'Tuliskan layanan yang dibutuhkan.'; el('fLain').focus(); return; }
       el('fErr').textContent = '';
       var btn = el('fBtn');
       btn.disabled = true; btn.textContent = 'Memproses...';
@@ -156,6 +164,7 @@
         alamat: el('fAlamat').value.trim(),
         wilayah: wil.data,
         katalogId: el('fLayanan').value,
+        layananLain: el('fLayanan').value === '__LAIN__' ? lain : '',
         website: el('fWebsite').value
       };
       google.script.run
@@ -170,6 +179,7 @@
           el('formBox').style.display = 'none';
           el('ticketBox').style.display = 'block';
           window.scrollTo(0, 0);
+          waKeKua(res.data, data.noHp);
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'Ambil Nomor Antrean';
@@ -178,8 +188,24 @@
         .daftarAntreanPublik(data);
     }
 
+    /* v6.4: setelah tiket tampil sebentar, WhatsApp langsung terbuka ke nomor KUA (Pengaturan → Umum)
+       dengan pesan dari template "Pesan pengunjung ke KUA". */
+    function waKeKua(d, hp) {
+      var nomor = FORM_DATA && FORM_DATA.waKua;
+      if (!nomor) return;
+      var vars = { nama: d.nama, nomor: d.nomor, layanan: d.layanan, tanggal: d.tanggal, hp: hp, sisa: d.sisa, instansi: FORM_DATA.instansi || 'KUA' };
+      var tpl = FORM_DATA.waKuaTpl || 'Nomor antrean: {nomor}\nNama: {nama}\nLayanan: {layanan}';
+      var pesan = tpl.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m; });
+      var url = 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pesan);
+      var a = el('tWaKua');
+      a.href = url; a.style.display = '';
+      el('tWaKuaTeks').textContent = 'Membuka WhatsApp KUA...';
+      setTimeout(function () { el('tWaKuaTeks').textContent = 'Kirim ke WhatsApp KUA'; location.href = url; }, 1200);
+    }
+
     function resetForm() {
       el('fForm').reset();
+      el('fLain').style.display = 'none'; el('tWaKua').style.display = 'none';
       el('fLayanan').value = ''; el('fInfo').textContent = '';
       if (PICKER) PICKER.render('');
       if (WIL) WIL.setMode('utama');

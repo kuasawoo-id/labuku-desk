@@ -1,4 +1,4 @@
-# LABUKU Desk — Layanan dan Pembukuan KUA
+# LABUKU Desk — Layanan Administrasi dan Pembukuan KUA
 
 Frontend statis LABUKU Desk untuk GitHub Pages. Backend tetap Google Apps Script
 (Web App JSON API) dan Google Sheets.
