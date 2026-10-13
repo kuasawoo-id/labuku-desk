@@ -90,21 +90,22 @@
   <!-- ============ SIDEBAR NAVIGASI ============ -->
   <nav id="sidebar" class="sidebar" style="display:none;">
     <div class="sidebar-header">
+      <button type="button" class="sidebar-ciut" id="sidebarCiut" onclick="ciutkanSidebar()" title="Ciutkan / lebarkan menu" aria-label="Ciutkan menu"><i class="bi bi-layout-sidebar-inset"></i></button>
       <h4 class="brand-title">LABUKU DESK</h4>
       <p class="brand-tagline">Layanan dan Pembukuan KUA</p>
       <p class="brand-sub">by Ahzani Labs</p>
       <p class="brand-instansi" id="sidebarInstansi"></p>
     </div>
     <ul class="sidebar-nav">
-      <li><a href="javascript:void(0)" onclick="navigateTo('dashboard')" class="nav-link active" data-section="dashboard">
+      <li><a href="javascript:void(0)" title="Dashboard" onclick="navigateTo('dashboard')" class="nav-link active" data-section="dashboard">
         <i class="bi bi-grid-1x2-fill"></i> <span>Dashboard</span></a></li>
-      <li><a href="javascript:void(0)" onclick="navigateTo('frontoffice')" class="nav-link" data-section="frontoffice">
+      <li><a href="javascript:void(0)" title="Front Office" onclick="navigateTo('frontoffice')" class="nav-link" data-section="frontoffice">
         <i class="bi bi-ticket-perforated"></i> <span>Front Office</span></a></li>
-      <li><a href="javascript:void(0)" onclick="navigateTo('backoffice')" class="nav-link" data-section="backoffice">
+      <li><a href="javascript:void(0)" title="Back Office" onclick="navigateTo('backoffice')" class="nav-link" data-section="backoffice">
         <i class="bi bi-briefcase-fill"></i> <span>Back Office</span></a></li>
-      <li><a href="javascript:void(0)" onclick="navigateTo('knowledge')" class="nav-link" data-section="knowledge">
+      <li><a href="javascript:void(0)" title="Katalog Layanan" onclick="navigateTo('knowledge')" class="nav-link" data-section="knowledge">
         <i class="bi bi-journal-richtext"></i> <span>Katalog Layanan</span></a></li>
-      <li id="navManajemen"><a href="javascript:void(0)" onclick="navigateTo('manajemen')" class="nav-link" data-section="manajemen">
+      <li id="navManajemen"><a href="javascript:void(0)" title="Pengaturan" onclick="navigateTo('manajemen')" class="nav-link" data-section="manajemen">
         <i class="bi bi-gear-fill"></i> <span>Pengaturan</span></a></li>
     </ul>
     <div class="sidebar-footer">
@@ -116,8 +117,8 @@
         </div>
       </div>
       <div class="user-mini-actions">
-        <button class="btn btn-sm btn-link" onclick="gantiNamaMasuk()"><i class="bi bi-person-badge"></i> Ganti nama</button>
-        <button class="btn btn-sm btn-link" onclick="logout()"><i class="bi bi-box-arrow-right"></i> Keluar</button>
+        <button class="btn btn-sm btn-link" onclick="gantiNamaMasuk()" title="Ganti nama"><i class="bi bi-person-badge"></i> <span>Ganti nama</span></button>
+        <button class="btn btn-sm btn-link" onclick="logout()" title="Keluar"><i class="bi bi-box-arrow-right"></i> <span>Keluar</span></button>
       </div>
     </div>
   </nav>

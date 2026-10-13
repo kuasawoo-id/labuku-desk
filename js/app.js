@@ -523,6 +523,14 @@ function toggleDarkMode() {
   html.setAttribute('data-theme', next);
   localStorage.setItem('labuku_theme', next);
 }
+/* v6.3: sidebar desktop bisa diciutkan (ikon saja); pilihan diingat di perangkat ini. */
+function ciutkanSidebar(paksa) {
+  const mini = typeof paksa === 'boolean' ? paksa : !document.body.classList.contains('sidebar-mini');
+  document.body.classList.toggle('sidebar-mini', mini);
+  lsSet('labuku_sidebar_mini', mini ? '1' : '');
+}
+document.addEventListener('DOMContentLoaded', () => { if (lsGet('labuku_sidebar_mini')) document.body.classList.add('sidebar-mini'); });
+
 function toggleSidebar() {
   document.getElementById('sidebar').classList.toggle('show');
   document.querySelector('.sidebar-overlay').classList.toggle('show');
@@ -1188,8 +1196,8 @@ function renderFoTable() {
           else {
             if (r.Status === 'Menunggu' || r.Status === 'Terlewat') aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="panggilFo('${r.ID}')">Panggil</button>`;
             if (waiting) aksi += `<button class="btn btn-labuku-accent btn-sm-pill" onclick="openVerifikasiPanel('${r.LayananID}')"><i class="bi bi-clipboard-check"></i> Verifikasi</button>`;
-            if (waiting) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" title="Kirim nomor antrean via WhatsApp" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i></button>`;
-            if (waiting) aksi += `<button class="btn btn-link btn-sm text-secondary" title="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
+            if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Kirim nomor antrean via WhatsApp" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i></button>`;
+            if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
           }
           return `
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
@@ -1370,8 +1378,11 @@ let taWil = null;
 /* ---------- Tambah antrean ---------- */
 function openTambahAntrean(prefill) {
   const p = prefill || {};
+  nikDicek = ''; // v6.3: NIK yang sama di form baru tetap dicek ulang
   openFormModal('Tambah Antrean', `
     <form id="taForm" onsubmit="event.preventDefault(); submitTambahAntrean();">
+      <input type="hidden" id="taLanjut" value=""><input type="hidden" id="taBaru" value="">
+      <div id="taLanjutInfo"></div>
       <div class="row g-3">
         <div class="col-md-6"><label class="form-label">NIK <span id="taNikInfo" class="nik-info"></span></label><input class="form-control" id="taNik" maxlength="16" inputmode="numeric" value="${escapeHtml(p.nik || '')}" oninput="cekNikTambah(this.value)"></div>
         <div class="col-md-6"><label class="form-label">Nama Lengkap</label><input class="form-control input-kapital" id="taNama" required value="${escapeHtml(p.nama || '')}"></div>
@@ -1401,6 +1412,7 @@ let nikDicek = '';
 function cekNikTambah(nilai) {
   const nik = String(nilai || '').replace(/\D/g, '');
   const info = document.getElementById('taNikInfo');
+  if (nik !== nikDicek) setPilihanPending('', false);
   if (nik.length !== 16) { nikDicek = ''; if (info) info.textContent = ''; return; }
   if (nik === nikDicek) return;
   nikDicek = nik;
@@ -1415,8 +1427,61 @@ function cekNikTambah(nilai) {
     document.getElementById('taAlamat').value = d.alamat || '';
     if (taWil && d.wilayahState) taWil.restore(d.wilayahState);
     if (info) info.innerHTML = '<span class="badge-status badge-online">Pengunjung lama</span>';
-    popupPengunjungLama(d.nama);
+    if (d.pending && d.pending.length) popupPending(d);
+    else popupPengunjungLama(d.nama);
   }, () => { if (info) info.textContent = ''; }).cekPemohonNik(nik);
+}
+
+/*
+ * v6.3: pengunjung lama dengan layanan PENDING — tampilkan kekurangan & keterangan,
+ * petugas memilih: lanjutkan (ID lama) atau daftar layanan baru (ID baru).
+ */
+function popupPending(d) {
+  const body = document.getElementById('formModalBody');
+  if (!body) return;
+  const lama = document.getElementById('popupLama');
+  if (lama) lama.remove();
+  window._pendingNik = d.pending;
+  const el = document.createElement('div');
+  el.id = 'popupLama';
+  el.className = 'popup-lama';
+  el.innerHTML = `<div class="popup-lama-kartu popup-pending" role="alertdialog" aria-live="assertive">
+      <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-hourglass-split text-warning"></i><div class="fw-bold">Ada layanan pending</div></div>
+      <div class="small text-secondary mb-3 text-start">${escapeHtml(d.nama || '')}</div>
+      ${d.pending.map((p, i) => `
+        <div class="pending-item text-start">
+          <div class="fw-semibold">${escapeHtml(p.jenis)}</div>
+          <div class="small text-secondary mb-1">${escapeHtml(p.id)} · ${fmtDate(p.tanggal)}</div>
+          ${p.kekurangan && p.kekurangan.length ? `<div class="small"><span class="text-secondary">Kekurangan:</span><ul class="mb-1 ps-3">${p.kekurangan.map(k => `<li>${escapeHtml(k)}</li>`).join('')}</ul></div>` : ''}
+          ${p.keterangan ? `<div class="small mb-2"><span class="text-secondary">Keterangan:</span> ${escapeHtml(p.keterangan)}</div>` : ''}
+          <button type="button" class="btn btn-labuku-primary w-100 btn-lanjut-pending" onclick="pilihPending(${i})"><i class="bi bi-arrow-repeat"></i> Lanjutkan layanan ini</button>
+        </div>`).join('')}
+      <button type="button" class="btn btn-labuku-outline w-100 mt-2" id="popupBaruBtn" onclick="pilihLayananBaru()">Daftar layanan baru</button>
+    </div>`;
+  body.appendChild(el);
+  setTimeout(() => { const b = el.querySelector('.btn-lanjut-pending'); if (b) b.focus(); }, 30);
+}
+
+function setPilihanPending(id, baru) {
+  const l = document.getElementById('taLanjut'), b = document.getElementById('taBaru'), info = document.getElementById('taLanjutInfo');
+  if (l) l.value = id || '';
+  if (b) b.value = baru ? '1' : '';
+  if (info) info.innerHTML = id ? `<div class="lanjut-info mb-3"><i class="bi bi-arrow-repeat"></i> Melanjutkan <b>${escapeHtml(id)}</b> <a href="javascript:void(0)" onclick="setPilihanPending('',true)">batal</a></div>` : '';
+}
+
+function pilihPending(i) {
+  const p = (window._pendingNik || [])[i];
+  const pop = document.getElementById('popupLama');
+  if (pop) pop.remove();
+  if (!p) return;
+  setPilihanPending(p.id, false);
+  if (katalogById(p.katalogId)) pilihLayananPicker('ta', p.katalogId);
+}
+
+function pilihLayananBaru() {
+  const pop = document.getElementById('popupLama');
+  if (pop) pop.remove();
+  setPilihanPending('', true);
 }
 
 function popupPengunjungLama(nama) {
@@ -1444,6 +1509,8 @@ function submitTambahAntrean() {
     nik: document.getElementById('taNik').value.replace(/\D/g, ''),
     nama: namaKapital(document.getElementById('taNama').value),
     noHp: document.getElementById('taHp').value.trim(),
+    lanjutLayananId: (document.getElementById('taLanjut') || {}).value || '',
+    layananBaru: !!((document.getElementById('taBaru') || {}).value),
     alamat: document.getElementById('taAlamat').value.trim(),
     katalogId: document.getElementById('taKatalog').value
   };
@@ -1587,8 +1654,8 @@ function renderVerifikasiPanel(res, layananId) {
         </div>
       </label>`).join('') + '</div>'}
 
-    <h6 class="fw-bold mt-3 mb-1">Catatan Kekurangan</h6>
-    <textarea class="form-control mb-3" id="catatanVerifikasi" rows="2" placeholder="Opsional. Yang belum dicentang otomatis disebut di WA."></textarea>
+    <h6 class="fw-bold mt-3 mb-1">Keterangan</h6>
+    <textarea class="form-control mb-3" id="catatanVerifikasi" rows="2" placeholder="Opsional — tampil di Back Office & WA. Saat Pending, yang belum dicentang otomatis disebut."></textarea>
     <div class="d-flex gap-2 flex-wrap">
       ${model === 'Langsung'
         ? `<button class="btn btn-labuku-primary flex-fill" id="btnVerifLengkap" onclick="submitVerifikasiUI('${layananId}', 'selesai')"><i class="bi bi-check2-all"></i> Lengkap → Selesai</button>`
@@ -1658,8 +1725,8 @@ function submitVerifikasiUI(layananId, hasil) {
     const daftar = kurang.map(x => '- ' + x);
     if (catatanUser) daftar.push((kurang.length ? 'Catatan: ' : '- ') + catatanUser);
     openWa(v.hp, isiTpl(waTpl(hasil === 'pending' ? 'wa_pending' : 'wa_langsung'), {
-      nama: v.layanan.PemohonNama, layanan: v.layanan.JenisLayanan, id: layananId, instansi: instansiNama(),
-      tanggal: tglPanjang(), kekurangan: daftar.join(NL), link: ''
+      nama: namaKapital(v.layanan.PemohonNama), layanan: v.layanan.JenisLayanan, id: layananId, instansi: instansiNama(),
+      tanggal: tglPanjang(), kekurangan: daftar.join(NL), link: '', keterangan: teksKeteranganWa(catatanUser)
     }));
   }
   verifikasiPanelLayananId = null;
@@ -1669,12 +1736,14 @@ function submitVerifikasiUI(layananId, hasil) {
   const boBackup = (window.AppState.bo || []).slice();
   const statusBaru = hasil === 'lanjut' ? 'Diproses' : (hasil === 'selesai' ? 'Selesai' : 'Pending');
   if (row) Object.assign(row, { Status: 'Selesai', LayananStatus: statusBaru, CatatanPending: hasil === 'pending' ? catatan : '' });
+  const boAda = (window.AppState.bo || []).find(b => b.ID === layananId);
+  if (boAda && hasil !== 'pending') boAda.Keterangan = catatanUser;
   if (hasil !== 'pending' && row && !window.AppState.bo.some(b => b.ID === layananId)) {
     const kat = katalogById(row.KatalogID);
     window.AppState.bo.push(hasil === 'lanjut'
-      ? { ID: layananId, PemohonNama: row.PemohonNama, JenisLayanan: row.LayananNama, KatalogID: row.KatalogID, TanggalMulai: row.Waktu, ASNNama: '', Status: 'Diproses', TahapBO: 'Isian', ModelHasil: modelOf(kat) }
+      ? { ID: layananId, PemohonNama: row.PemohonNama, JenisLayanan: row.LayananNama, KatalogID: row.KatalogID, TanggalMulai: row.Waktu, ASNNama: '', Status: 'Diproses', TahapBO: 'Isian', ModelHasil: modelOf(kat), Keterangan: catatanUser }
       : { ID: layananId, PemohonNama: row.PemohonNama, JenisLayanan: row.LayananNama, KatalogID: row.KatalogID, TanggalMulai: row.Waktu, TanggalSelesai: new Date().toISOString(),
-          ASNNama: window.AppState.who || '', Status: 'Selesai', TahapBO: 'Selesai', ModelHasil: 'Langsung' });
+          ASNNama: window.AppState.who || '', Status: 'Selesai', TahapBO: 'Selesai', ModelHasil: 'Langsung', Keterangan: catatanUser });
   }
   pendingStart();
   renderFoTable(); saveFoToCache();
@@ -1814,7 +1883,7 @@ function renderBoTable() {
           <tr>
             <td class="fw-semibold" style="white-space:nowrap;">${escapeHtml(l.ID)}</td>
             <td>${escapeHtml(namaKapital(l.PemohonNama))}</td>
-            <td>${escapeHtml(l.JenisLayanan)}<div class="small text-secondary">${escapeHtml(kategoriOf(l).replace(/^Layanan /, ''))} <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div></td>
+            <td>${escapeHtml(l.JenisLayanan)}<div class="small text-secondary">${escapeHtml(kategoriOf(l).replace(/^Layanan /, ''))} <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div>${l.Keterangan ? `<div class="small ket-baris" title="${escapeHtml(l.Keterangan)}"><i class="bi bi-chat-left-text"></i> ${escapeHtml(l.Keterangan)}</div>` : ''}</td>
             <td style="white-space:nowrap;">${fmtDate(l.TanggalMulai)}${t.label === 'Selesai' && l.TanggalSelesai ? `<div class="small text-secondary">Selesai ${fmtDate(l.TanggalSelesai)}</div>` : ''}</td>
             <td><span class="badge-status ${t.cls}">${label}</span></td>
             <td>${l.ASNNama ? escapeHtml(l.ASNNama) : '<span class="text-secondary small">Belum diambil</span>'}</td>
@@ -1884,6 +1953,7 @@ function renderServiceWorkspace(res, layananId, initialTab) {
         <span class="badge-status ${(BO_TAHAP[tahap] || BO_TAHAP.Isian).cls}">${tahap}</span>
       </div>
     </div>
+    ${d.layanan.Keterangan ? `<div class="ket-box mb-3"><i class="bi bi-chat-left-text"></i><div><div class="small text-secondary">Keterangan</div>${escapeHtml(d.layanan.Keterangan)}</div></div>` : ''}
     ${tabs.length ? `<div class="doc-tab-nav">${tabs.map(([k, lb]) => `<div class="doc-tab-link ${k === awal ? 'active' : ''}" data-tab="${k}" onclick="switchWorkspaceTab('${k}')">${lb}</div>`).join('')}</div>` : ''}
     <div id="wsTabContent"></div>
     <div class="petunjuk-overlay" id="petunjukOverlay" onclick="tutupPetunjuk()"></div>
@@ -2163,11 +2233,14 @@ function buildWorkspaceSelesaiTab(d) {
     </div>`;
 }
 
+/** v6.3: {keterangan} di template WA → baris "Keterangan: ..." (kosong bila tidak ada). */
+function teksKeteranganWa(k) { k = String(k || '').trim(); return k ? NL + 'Keterangan: ' + k : ''; }
+
 function pesanWaHasil(d, pdf) {
   const KEY = { TTE: 'wa_tte', Arsip: 'wa_arsip', Langsung: 'wa_langsung' };
   return isiTpl(waTpl(KEY[d.model] || 'wa_tte'), {
-    nama: d.layanan.PemohonNama || '', layanan: d.layanan.JenisLayanan, id: d.layanan.ID, instansi: instansiNama(),
-    tanggal: tglPanjang(), link: pdf ? pdf.FileURL : ''
+    nama: namaKapital(d.layanan.PemohonNama || ''), layanan: d.layanan.JenisLayanan, id: d.layanan.ID, instansi: instansiNama(),
+    tanggal: tglPanjang(), link: pdf ? pdf.FileURL : '', keterangan: teksKeteranganWa(d.layanan.Keterangan)
   });
 }
 
@@ -2830,6 +2903,7 @@ function lihatDetailRiwayat(layananId) {
           <div class="col-md-6"><span class="text-secondary">Selesai:</span> ${layanan.TanggalSelesai ? fmtDateTime(layanan.TanggalSelesai) : '-'}</div>
           <div class="col-md-6"><span class="text-secondary">Dikerjakan oleh:</span> ${escapeHtml(layanan.ASNNama || '-')}</div>
           <div class="col-md-6"><span class="text-secondary">Persyaratan:</span> ${valid} / ${(persyaratan || []).length} valid</div>
+          ${layanan.Keterangan ? `<div class="col-12"><span class="text-secondary">Keterangan:</span> ${escapeHtml(layanan.Keterangan)}</div>` : ''}
           ${layanan.CatatanPending ? `<div class="col-12"><span class="text-secondary">Catatan pending:</span> ${escapeHtml(layanan.CatatanPending)}</div>` : ''}
         </div>
         <h6 class="fw-bold small">Riwayat Kunjungan (${kunjungan.length}x)</h6>
@@ -3083,12 +3157,13 @@ function toggleUserStatusUI(userId) {
 const WA_TPL_INFO = [
   ['wa_antrean', 'Nomor antrean', 'Dikirim saat pemohon mendapat nomor antrean.', ['nama', 'nomor', 'layanan', 'instansi', 'tanggal', 'sisa', 'posisi']],
   ['wa_pending', 'Pending (persyaratan kurang)', '{kekurangan} = persyaratan yang belum dicentang + catatan.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'kekurangan']],
-  ['wa_tte', 'Selesai — TTE', 'Berisi tautan PDF ber-TTE.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link']],
-  ['wa_arsip', 'Selesai — Arsip (tanpa TTE)', 'Pemberitahuan selesai, tanpa PDF.', ['nama', 'layanan', 'id', 'instansi', 'tanggal']],
-  ['wa_langsung', 'Selesai — di Front Office', 'Dikirim dari verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal']]
+  ['wa_tte', 'Selesai — TTE', 'Berisi tautan PDF ber-TTE.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link', 'keterangan']],
+  ['wa_arsip', 'Selesai — Arsip (tanpa TTE)', 'Pemberitahuan selesai, tanpa PDF.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'keterangan']],
+  ['wa_langsung', 'Selesai — di Front Office', 'Dikirim dari verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'keterangan']]
 ];
 const WA_CONTOH = {
   nama: 'Ahmad Hidayat', nomor: 'A-007', layanan: 'Legalisasi Buku Nikah', id: 'LYN-2026-00042', tanggal: 'Kamis, 08 Oktober 2026', sisa: 2,
+  keterangan: String.fromCharCode(10) + 'Keterangan: Mohon bawa KTP asli saat pengambilan.',
   posisi: 'Saat ini ada 2 antrean sebelum Anda.', kekurangan: '- Fotokopi KK' + String.fromCharCode(10) + '- Pas foto 2x3', link: 'https:' + String.fromCharCode(47, 47) + 'drive.google.com/file/d/contoh/view'
 };
 
