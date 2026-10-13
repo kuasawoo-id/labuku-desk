@@ -585,13 +585,38 @@ function labelTabelKartu_(root) {
     });
   });
 }
+/* v6.2: tombol mata di setiap kolom password (login, aktivasi, ganti password). */
+function pasangMataPassword_(root) {
+  if (!root || !root.querySelectorAll) return;
+  root.querySelectorAll('input[type="password"]:not([data-mata])').forEach(inp => {
+    inp.setAttribute('data-mata', '1');
+    const wrap = document.createElement('div');
+    wrap.className = 'pw-wrap';
+    inp.classList.forEach(c => { if (/^m[tb]-\d$/.test(c)) wrap.classList.add(c); });
+    Array.from(wrap.classList).forEach(c => { if (c !== 'pw-wrap') inp.classList.remove(c); });
+    inp.parentNode.insertBefore(wrap, inp);
+    wrap.appendChild(inp);
+    const btn = document.createElement('button');
+    btn.type = 'button'; btn.className = 'pw-mata'; btn.tabIndex = -1;
+    btn.setAttribute('aria-label', 'Lihat password'); btn.innerHTML = '<i class="bi bi-eye"></i>';
+    btn.addEventListener('click', () => {
+      const lihat = inp.type === 'password';
+      inp.type = lihat ? 'text' : 'password';
+      btn.innerHTML = lihat ? '<i class="bi bi-eye-slash"></i>' : '<i class="bi bi-eye"></i>';
+      btn.setAttribute('aria-label', lihat ? 'Sembunyikan password' : 'Lihat password');
+    });
+    wrap.appendChild(btn);
+  });
+}
+
 (function pasangLabelTabel_() {
   let antre = false;
-  const jalankan = () => { antre = false; labelTabelKartu_(document.getElementById('mainContent')); };
+  const jalankan = () => { antre = false; const m = document.getElementById('mainContent'); labelTabelKartu_(m); pasangMataPassword_(m); };
   const obs = new MutationObserver(() => { if (!antre) { antre = true; requestAnimationFrame(jalankan); } });
   document.addEventListener('DOMContentLoaded', () => {
     const main = document.getElementById('mainContent');
     if (main) obs.observe(main, { childList: true, subtree: true });
+    pasangMataPassword_(document.getElementById('authScreen'));
   });
 })();
 
@@ -953,7 +978,7 @@ function renderDashboard(res) {
             ${d.aktivitasHariIni.map(a => `
               <tr style="cursor:pointer" onclick="openWorkspace('${a.id}')">
                 <td class="fw-semibold">${escapeHtml(a.id)}</td>
-                <td>${escapeHtml(a.nama)}</td>
+                <td>${escapeHtml(namaKapital(a.nama))}</td>
                 <td>${escapeHtml(a.jenis)}</td>
                 <td><span class="badge-status ${statusBadgeClass(a.status)}">${a.status === 'Diproses' ? 'Proses' : escapeHtml(a.status)}</span></td>
               </tr>`).join('')}
@@ -1136,7 +1161,15 @@ function renderFoTable() {
   if (sub) sub.textContent = foFilter.periode === 'today'
     ? 'Antrean hari ini · ' + new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
     : 'Antrean ' + fmtDate(r0.dari) + ' – ' + fmtDate(r0.sampai);
-  const list = foFilteredList();
+  const u = urutTabel.fo;
+  const STATUS_URUT = ['Menunggu', 'Di Loket', 'Proses', 'Pending', 'Selesai', 'Terlewat'];
+  const AMBIL = {
+    no: r => waktuMs(r.Waktu) * 1000 + (parseInt(String(r.Nomor).replace(/\D/g, ''), 10) || 0),
+    tgl: r => waktuMs(r.Waktu),
+    pemohon: r => teksUrut(r.PemohonNama), layanan: r => teksUrut(r.LayananNama),
+    status: r => STATUS_URUT.indexOf(foStatusInfo(r).label)
+  };
+  const list = urutkanList(foFilteredList(), AMBIL[u.key] || AMBIL.no, u.dir);
   renderFoStats(list);
   const showTgl = foFilter.periode !== 'today';
   if (list.length === 0) {
@@ -1145,7 +1178,7 @@ function renderFoTable() {
   }
   box.innerHTML = `
     <table class="lb-table">
-      <thead><tr><th>No.</th>${showTgl ? '<th>Tanggal</th>' : ''}<th>Pemohon</th><th>Layanan</th><th>Status</th><th style="text-align:right;">Aksi</th></tr></thead>
+      <thead><tr>${thUrut('fo', 'no', 'No.')}${showTgl ? thUrut('fo', 'tgl', 'Tanggal') : ''}${thUrut('fo', 'pemohon', 'Pemohon')}${thUrut('fo', 'layanan', 'Layanan')}${thUrut('fo', 'status', 'Status')}<th style="text-align:right;">Aksi</th></tr></thead>
       <tbody>
         ${list.map(r => {
           const st = foStatusInfo(r);
@@ -1162,7 +1195,7 @@ function renderFoTable() {
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
             <td class="fw-bold fs-6" style="white-space:nowrap;">${escapeHtml(r.Nomor)}</td>
             ${showTgl ? `<td style="white-space:nowrap;">${fmtDate(r.Waktu)}</td>` : ''}
-            <td><div class="fw-semibold">${escapeHtml(r.PemohonNama)}</div>
+            <td><div class="fw-semibold">${escapeHtml(namaKapital(r.PemohonNama))}</div>
               <div class="small text-secondary">${r.Sumber === 'Online' ? '<span class="badge-status badge-online me-1">Online</span>' : ''}${escapeHtml(r.NoHP || '')}</div></td>
             <td>${escapeHtml(r.LayananNama)}<div class="small text-secondary">${escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
             <td><span class="badge-status ${st.cls}">${st.label}</span></td>
@@ -1245,9 +1278,39 @@ function isiTpl(tpl, vars) {
 }
 function instansiNama() { return (window.AppState.config && window.AppState.config.instansi) || 'KUA'; }
 function tglPanjang(d) { return new Date(d || new Date()).toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' }); }
-const MODEL_LIST = ['TTE', 'PDF', 'Arsip', 'Langsung'];
-const MODEL_LABEL = { TTE: 'TTE', PDF: 'PDF langsung', Arsip: 'Arsip PDF', Langsung: 'Selesai di FO' };
-function modelOf(k) { const m = k && k.ModelHasil; return MODEL_LIST.indexOf(m) >= 0 ? m : 'TTE'; }
+/* v6.2: 3 model hasil. Model 'PDF' lama dibaca sebagai Arsip. */
+const MODEL_LIST = ['TTE', 'Arsip', 'Langsung'];
+const MODEL_LABEL = { TTE: 'TTE', Arsip: 'Arsip (tanpa TTE)', Langsung: 'Selesai di FO' };
+function normModel(m) { return m === 'PDF' ? 'Arsip' : (MODEL_LIST.indexOf(m) >= 0 ? m : 'TTE'); }
+function modelOf(k) { return normModel(k && k.ModelHasil); }
+
+/* ---------- v6.2: urutkan tabel (klik kepala kolom); bawaan: terbaru di atas ---------- */
+const urutTabel = { fo: { key: 'no', dir: 'desc' }, bo: { key: 'id', dir: 'desc' } };
+const URUT_TURUN_DULU = ['no', 'tgl', 'id', 'masuk'];
+function thUrut(tabel, key, label) {
+  const u = urutTabel[tabel];
+  const aktif = u.key === key;
+  const ikon = aktif ? (u.dir === 'asc' ? 'bi-caret-up-fill' : 'bi-caret-down-fill') : 'bi-chevron-expand';
+  return `<th class="th-urut${aktif ? ' aktif' : ''}" data-urut="${key}" onclick="ubahUrut('${tabel}','${key}')" title="Urutkan">${label}<i class="bi ${ikon}"></i></th>`;
+}
+function ubahUrut(tabel, key) {
+  const u = urutTabel[tabel];
+  if (u.key === key) u.dir = u.dir === 'asc' ? 'desc' : 'asc';
+  else { u.key = key; u.dir = URUT_TURUN_DULU.indexOf(key) >= 0 ? 'desc' : 'asc'; }
+  if (tabel === 'fo') renderFoTable(); else renderBoTable();
+}
+function urutkanList(list, ambil, dir) {
+  const k = dir === 'asc' ? 1 : -1;
+  return list.map((x, i) => [x, i]).sort((a, b) => {
+    const x = ambil(a[0]), y = ambil(b[0]);
+    if (x < y) return -k;
+    if (x > y) return k;
+    return a[1] - b[1];
+  }).map(p => p[0]);
+}
+function waktuMs(v) { const t = new Date(v).getTime(); return isNaN(t) ? 0 : t; }
+function teksUrut(v) { return String(v == null ? '' : v).toLowerCase(); }
+function namaKapital(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toUpperCase(); }
 
 function waAntrean(id) {
   const r = (window.AppState.fo || []).find(x => x.ID === id);
@@ -1308,19 +1371,10 @@ let taWil = null;
 function openTambahAntrean(prefill) {
   const p = prefill || {};
   openFormModal('Tambah Antrean', `
-    <div class="mb-3">
-      <label class="form-label">Pemohon lama (opsional)</label>
-      <div class="input-group">
-        <input type="text" class="form-control" id="taCari2" placeholder="Nama / NIK / No. HP / ID layanan" onkeydown="if(event.key==='Enter'){event.preventDefault();cariDataLamaFo();}">
-        <button class="btn btn-labuku-outline" type="button" onclick="cariDataLamaFo()"><i class="bi bi-search"></i></button>
-      </div>
-      <div id="taCariHasil" class="mt-2"></div>
-    </div>
-    <hr>
     <form id="taForm" onsubmit="event.preventDefault(); submitTambahAntrean();">
       <div class="row g-3">
-        <div class="col-md-6"><label class="form-label">NIK</label><input class="form-control" id="taNik" maxlength="16" inputmode="numeric" value="${escapeHtml(p.nik || '')}"></div>
-        <div class="col-md-6"><label class="form-label">Nama Lengkap</label><input class="form-control" id="taNama" required value="${escapeHtml(p.nama || '')}"></div>
+        <div class="col-md-6"><label class="form-label">NIK <span id="taNikInfo" class="nik-info"></span></label><input class="form-control" id="taNik" maxlength="16" inputmode="numeric" value="${escapeHtml(p.nik || '')}" oninput="cekNikTambah(this.value)"></div>
+        <div class="col-md-6"><label class="form-label">Nama Lengkap</label><input class="form-control input-kapital" id="taNama" required value="${escapeHtml(p.nama || '')}"></div>
         <div class="col-md-6"><label class="form-label">Nomor WhatsApp</label><input class="form-control" id="taHp" inputmode="tel" placeholder="08xxxxxxxxxx" required value="${escapeHtml(p.noHp || '')}"></div>
         <div class="col-12"><label class="form-label">Alamat</label><div id="taWilayah"></div>
           <input class="form-control mt-2" id="taAlamat" maxlength="120" placeholder="Dusun / RT / RW (opsional)" value="${escapeHtml(p.alamat || '')}"></div>
@@ -1339,22 +1393,48 @@ function openTambahAntrean(prefill) {
   if (!p.katalogId) renderLayananPicker('ta');
 }
 
-function cariDataLamaFo() {
-  const q = document.getElementById('taCari2').value.trim();
-  const box = document.getElementById('taCariHasil');
-  if (q.length < 2) { box.innerHTML = ''; return; }
-  box.innerHTML = '<div class="small text-secondary">Mencari...</div>';
-  gsr(function (res) {
-    if (!res || !res.success) { box.innerHTML = '<div class="small text-danger">' + escapeHtml((res && res.message) || 'Gagal mencari.') + '</div>'; return; }
-    if (!res.data.length) { box.innerHTML = '<div class="small text-secondary">Tidak ada data lama. Isi form di bawah untuk pendaftaran baru.</div>'; return; }
-    box.innerHTML = res.data.map(r => `
-      <div class="d-flex justify-content-between align-items-center gap-2 py-2" style="border-bottom:1px solid var(--outline);">
-        <div class="small"><strong>${escapeHtml(r.nama)}</strong> <span class="badge-status ${statusBadgeClass(r.status)}">${escapeHtml(r.status)}</span>
-          <div class="text-secondary">${escapeHtml(r.layananId)} · ${escapeHtml(r.jenisLayanan)}</div>
-          ${r.catatanPending ? `<div class="text-secondary fst-italic">Catatan: ${escapeHtml(r.catatanPending)}</div>` : ''}</div>
-        ${r.status === 'Pending' ? `<button class="btn btn-labuku-accent btn-sm-pill" onclick="lanjutkanLayananFo('${r.layananId}')">Lanjutkan</button>` : ''}
-      </div>`).join('');
-  }, function (err) { box.innerHTML = '<div class="small text-danger">' + escapeHtml(err.message || err) + '</div>'; }).cariPemohonLama(q);
+/*
+ * v6.2: NIK 16 digit → dicek ke data pemohon lama. Bila ada: isian terisi otomatis + pemberitahuan.
+ * Layanan PENDING untuk jenis yang sama otomatis dilanjutkan oleh server (ID layanan tetap).
+ */
+let nikDicek = '';
+function cekNikTambah(nilai) {
+  const nik = String(nilai || '').replace(/\D/g, '');
+  const info = document.getElementById('taNikInfo');
+  if (nik.length !== 16) { nikDicek = ''; if (info) info.textContent = ''; return; }
+  if (nik === nikDicek) return;
+  nikDicek = nik;
+  if (info) info.innerHTML = '<span class="spinner-border spinner-border-sm"></span>';
+  gsr(res => {
+    const el = document.getElementById('taNik');
+    if (!el || el.value.replace(/\D/g, '') !== nik) return;
+    if (!res || !res.success || !res.data || !res.data.ditemukan) { if (info) info.textContent = ''; return; }
+    const d = res.data;
+    document.getElementById('taNama').value = d.nama || '';
+    document.getElementById('taHp').value = d.noHp || '';
+    document.getElementById('taAlamat').value = d.alamat || '';
+    if (taWil && d.wilayahState) taWil.restore(d.wilayahState);
+    if (info) info.innerHTML = '<span class="badge-status badge-online">Pengunjung lama</span>';
+    popupPengunjungLama(d.nama);
+  }, () => { if (info) info.textContent = ''; }).cekPemohonNik(nik);
+}
+
+function popupPengunjungLama(nama) {
+  const body = document.getElementById('formModalBody');
+  if (!body) return;
+  const lama = document.getElementById('popupLama');
+  if (lama) lama.remove();
+  const el = document.createElement('div');
+  el.id = 'popupLama';
+  el.className = 'popup-lama';
+  el.innerHTML = `<div class="popup-lama-kartu" role="alertdialog" aria-live="assertive">
+      <i class="bi bi-person-check"></i>
+      <div class="fw-bold mt-2">Pengunjung lama</div>
+      <div class="small text-secondary mb-3">${escapeHtml(nama || '')} — data diisi otomatis.</div>
+      <button type="button" class="btn btn-labuku-primary w-100" id="popupLamaYa" onclick="document.getElementById('popupLama').remove()">Ya</button>
+    </div>`;
+  body.appendChild(el);
+  setTimeout(() => { const b = document.getElementById('popupLamaYa'); if (b) b.focus(); }, 30);
 }
 
 function submitTambahAntrean() {
@@ -1362,7 +1442,7 @@ function submitTambahAntrean() {
   if (!form.checkValidity()) { form.reportValidity(); return; }
   const data = {
     nik: document.getElementById('taNik').value.replace(/\D/g, ''),
-    nama: document.getElementById('taNama').value.trim(),
+    nama: namaKapital(document.getElementById('taNama').value),
     noHp: document.getElementById('taHp').value.trim(),
     alamat: document.getElementById('taAlamat').value.trim(),
     katalogId: document.getElementById('taKatalog').value
@@ -1402,14 +1482,6 @@ function submitTambahAntrean() {
   }).tambahAntrean(data);
 }
 
-function lanjutkanLayananFo(layananId) {
-  closeFormModal();
-  gsr(function (res) {
-    if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
-    if (res.data.row) { window.AppState.fo.push(res.data.row); renderFoTable(); saveFoToCache(); showAntreanDibuat(res.data.row); }
-    else refreshFrontOffice(true);
-  }, function (err) { showToast('Error', err.message || err, 'danger'); }).lanjutkanLayanan(layananId);
-}
 
 function showAntreanDibuat(row) {
   const sisa = sisaSebelum(row.ID);
@@ -1417,7 +1489,7 @@ function showAntreanDibuat(row) {
     <div class="ptsp-ticket-card mb-3">
       <div class="ptsp-ticket-label">Nomor Antrean</div>
       <div class="ptsp-ticket-num">${escapeHtml(row.Nomor)}</div>
-      <div class="ptsp-service-chip"><div class="text-start"><div class="small opacity-75">${escapeHtml(row.PemohonNama)}</div><div class="fw-semibold">${escapeHtml(row.LayananNama)}</div></div></div>
+      <div class="ptsp-service-chip"><div class="text-start"><div class="small opacity-75">${escapeHtml(namaKapital(row.PemohonNama))}</div><div class="fw-semibold">${escapeHtml(row.LayananNama)}</div></div></div>
     </div>
     <p class="text-center small text-secondary">${sisa > 0 ? sisa + ' antrean menunggu sebelum pemohon ini.' : 'Pemohon ini antrean berikutnya.'}</p>
     <button class="btn btn-labuku-accent w-100" onclick="waAntrean('${row.ID}')"><i class="bi bi-whatsapp"></i> Kirim Nomor Antrean via WhatsApp</button>`);
@@ -1429,7 +1501,7 @@ function openQrModal() {
   if (!url) { showToast('Info', 'URL form publik belum tersedia. Deploy aplikasi sebagai Web app terlebih dahulu.', 'warning'); return; }
   const instansi = (window.AppState.config && window.AppState.config.instansi) || 'KUA';
   openFormModal('Form Antrean Publik', `
-    <p class="small text-secondary">Bagikan link atau cetak QR ini. Pendaftar langsung mendapat nomor antrean hari ini dan otomatis muncul di Front Office.</p>
+
     <div class="input-group mb-3">
       <input type="text" class="form-control" id="qrUrl" readonly value="${escapeHtml(url)}">
       <button class="btn btn-labuku-outline" type="button" onclick="salinLinkPublik()"><i class="bi bi-clipboard"></i> Salin</button>
@@ -1496,26 +1568,27 @@ function renderVerifikasiPanel(res, layananId) {
   panel.innerHTML = `
     <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
       <div>
-        <div class="fw-bold"><i class="bi bi-person"></i> ${escapeHtml(layanan.PemohonNama)}</div>
+        <div class="fw-bold"><i class="bi bi-person"></i> ${escapeHtml(namaKapital(layanan.PemohonNama))}</div>
         <div class="small text-secondary">${escapeHtml(layanan.ID)} — ${escapeHtml(layanan.JenisLayanan)} · diajukan ${fmtDateTime(layanan.TanggalMulai)}</div>
-        <div class="small mt-1"><span class="badge-status badge-model">Model hasil: ${escapeHtml(MODEL_LABEL[model])}</span></div>
+        <div class="small mt-1"><span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div>
       </div>
       <span class="badge-status badge-netral align-self-start" id="verifCount"></span>
     </div>
 
     <h6 class="fw-bold mb-1">Berkas Persyaratan</h6>
     ${persyaratan.length === 0 ? '<p class="text-secondary small">Checklist berkas layanan ini belum diatur di Katalog. Periksa berkas secara manual.</p>' : `
-      <div class="small mb-1"><a href="javascript:void(0)" onclick="centangSemua()">Centang semua</a></div>` + persyaratan.map(p => `
+      <div class="small mb-1"><a href="javascript:void(0)" onclick="centangSemua()">Centang semua</a></div>
+      <div class="verif-grid${persyaratan.length > 4 ? ' dua-kolom' : ''}">` + persyaratan.map(p => `
       <label class="checklist-item" style="cursor:pointer;">
         <input type="checkbox" class="form-check-input verif-check" data-nama="${escapeHtml(p.ItemNama)}" ${p.Status === 'Valid' ? 'checked' : ''} onchange="toggleChecklist('${p.ID}', this.checked)">
         <div class="flex-grow-1">
           <div class="fw-semibold">${escapeHtml(p.ItemNama)}</div>
           ${p.DivalidasiOleh ? `<div class="small text-secondary">Diperiksa ${escapeHtml(p.DivalidasiOleh)}</div>` : ''}
         </div>
-      </label>`).join('')}
+      </label>`).join('') + '</div>'}
 
     <h6 class="fw-bold mt-3 mb-1">Catatan Kekurangan</h6>
-    <textarea class="form-control mb-3" id="catatanVerifikasi" rows="2" placeholder="Opsional bila ada persyaratan yang belum dicentang (otomatis disebut di WA). Wajib bila checklist kosong."></textarea>
+    <textarea class="form-control mb-3" id="catatanVerifikasi" rows="2" placeholder="Opsional. Yang belum dicentang otomatis disebut di WA."></textarea>
     <div class="d-flex gap-2 flex-wrap">
       ${model === 'Langsung'
         ? `<button class="btn btn-labuku-primary flex-fill" id="btnVerifLengkap" onclick="submitVerifikasiUI('${layananId}', 'selesai')"><i class="bi bi-check2-all"></i> Lengkap → Selesai</button>`
@@ -1524,7 +1597,7 @@ function renderVerifikasiPanel(res, layananId) {
     </div>
     <label class="form-check verif-wa mt-2">
       <input type="checkbox" class="form-check-input" id="verifKirimWa" ${hp ? 'checked' : 'disabled'}>
-      <span class="form-check-label">Kirim WA ke pemohon ${hp ? '(' + escapeHtml(hp) + ')' : '(nomor belum ada)'} saat Pending${model === 'Langsung' ? ' atau Selesai' : ''}</span>
+      <span class="form-check-label">Kirim WA saat Pending ${hp ? '(' + escapeHtml(hp) + ')' : '(nomor belum ada)'}</span>
     </label>
     <div class="small text-secondary mt-1" id="verifHint"></div>
 
@@ -1546,9 +1619,7 @@ function updateVerifButtons() {
   const lengkap = checked === boxes.length;
   if (btn) btn.disabled = !lengkap;
   const langsung = window._verifData && window._verifData.model === 'Langsung';
-  if (hint) hint.textContent = lengkap
-    ? (langsung ? 'Layanan ini diselesaikan langsung di Front Office (tanpa isian Back Office) dan tetap tercatat di riwayat Back Office.' : '')
-    : 'Centang semua persyaratan untuk mengaktifkan tombol "Lengkap". Bila ada yang kurang, pilih Pending — yang belum dicentang otomatis disebut di WA.';
+  if (hint) hint.textContent = lengkap ? (langsung ? 'Selesai → WA terkirim ke pemohon.' : '') : 'Centang semua untuk mengaktifkan "Lengkap".';
 }
 
 function centangSemua() {
@@ -1581,7 +1652,8 @@ function submitVerifikasiUI(layananId, hasil) {
     showToast('Peringatan', 'Masih ada persyaratan yang belum dicentang.', 'warning'); return;
   }
   const v = window._verifData || {};
-  const kirimWa = !!(document.getElementById('verifKirimWa') || {}).checked;
+  /* v6.2: Selesai selalu disertai WA; checkbox hanya untuk Pending. */
+  const kirimWa = hasil === 'selesai' || !!(document.getElementById('verifKirimWa') || {}).checked;
   if (kirimWa && (hasil === 'pending' || hasil === 'selesai') && v.layanan) {
     const daftar = kurang.map(x => '- ' + x);
     if (catatanUser) daftar.push((kurang.length ? 'Catatan: ' : '- ') + catatanUser);
@@ -1642,7 +1714,7 @@ function renderBackOffice() {
       <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
         <div>
           <h2 class="page-heading">Back Office</h2>
-          <p class="page-sub mb-0">Pengerjaan layanan &amp; riwayat. Yang sudah selesai tetap tercatat di sini — klik <b>Detail</b> untuk jejak lengkap.</p>
+
         </div>
         <div class="d-flex gap-2 align-items-center flex-wrap">
           <span class="badge-status badge-proses" id="boCount"></span>
@@ -1719,22 +1791,29 @@ function renderBoTable() {
     if (r && !dalamRentang(l.TanggalMulai, r)) return false;
     return true;
   });
+  const ub = urutTabel.bo;
+  const AMBIL_BO = {
+    id: l => String(l.ID), pemohon: l => teksUrut(l.PemohonNama), jenis: l => teksUrut(l.JenisLayanan),
+    masuk: l => waktuMs(l.TanggalMulai), tahap: l => teksUrut(boTahap(l)), asn: l => teksUrut(l.ASNNama || '~')
+  };
+  const listUrut = urutkanList(list, AMBIL_BO[ub.key] || AMBIL_BO.id, ub.dir);
+  list.length = 0; listUrut.forEach(x => list.push(x));
   window._boFiltered = list;
   const cnt = document.getElementById('boCount');
   if (cnt) cnt.innerHTML = '<i class="bi bi-briefcase"></i> ' + all.filter(l => boTahap(l) !== 'Selesai').length + ' belum selesai';
   if (list.length === 0) { box.innerHTML = emptyState('bi-briefcase', all.length ? 'Tidak ada layanan yang cocok dengan filter.' : 'Belum ada layanan yang diproses atau selesai pada periode ini.'); return; }
   box.innerHTML = `
     <table class="lb-table">
-      <thead><tr><th>ID Layanan</th><th>Pemohon</th><th>Jenis Layanan</th><th>Masuk</th><th>Tahap</th><th>Dikerjakan oleh</th><th style="text-align:right;">Aksi</th></tr></thead>
+      <thead><tr>${thUrut('bo', 'id', 'ID Layanan')}${thUrut('bo', 'pemohon', 'Pemohon')}${thUrut('bo', 'jenis', 'Jenis Layanan')}${thUrut('bo', 'masuk', 'Masuk')}${thUrut('bo', 'tahap', 'Tahap')}${thUrut('bo', 'asn', 'Dikerjakan oleh')}<th style="text-align:right;">Aksi</th></tr></thead>
       <tbody>
         ${list.map(l => {
           const t = BO_TAHAP[boTahap(l)] || BO_TAHAP.Isian;
-          const model = MODEL_LIST.indexOf(l.ModelHasil) >= 0 ? l.ModelHasil : modelOf(katalogById(l.KatalogID));
+          const model = l.ModelHasil ? normModel(l.ModelHasil) : modelOf(katalogById(l.KatalogID));
           const label = t.label === 'Siap Kirim' && (model === 'Arsip' || model === 'Langsung') ? 'Siap Selesai' : t.label;
           return `
           <tr>
             <td class="fw-semibold" style="white-space:nowrap;">${escapeHtml(l.ID)}</td>
-            <td>${escapeHtml(l.PemohonNama)}</td>
+            <td>${escapeHtml(namaKapital(l.PemohonNama))}</td>
             <td>${escapeHtml(l.JenisLayanan)}<div class="small text-secondary">${escapeHtml(kategoriOf(l).replace(/^Layanan /, ''))} <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div></td>
             <td style="white-space:nowrap;">${fmtDate(l.TanggalMulai)}${t.label === 'Selesai' && l.TanggalSelesai ? `<div class="small text-secondary">Selesai ${fmtDate(l.TanggalSelesai)}</div>` : ''}</td>
             <td><span class="badge-status ${t.cls}">${label}</span></td>
@@ -1782,40 +1861,36 @@ function renderServiceWorkspace(res, layananId, initialTab) {
   const container = document.getElementById('section-workspace');
   if (!res.success) { container.innerHTML = emptyState('bi-exclamation-triangle', res.message); return; }
   const d = res.data;
-  const model = MODEL_LIST.indexOf(d.model) >= 0 ? d.model : 'TTE';
+  const model = normModel(d.model);
   d.model = model;
-  workspaceState = { layananId, activeTab: model === 'Langsung' ? 'tte' : 'isian', canEdit: d.canEdit };
-  /* v4: alur kerja mengikuti model hasil layanan (diatur di Katalog Layanan). */
-  const TAB_HASIL = { TTE: '2. Unggah TTE &amp; Kirim', PDF: '2. Kirim Hasil', Arsip: '2. Selesaikan', Langsung: 'Selesaikan' };
-  const TAB_ISIAN = { TTE: '1. Isian &amp; PDF', PDF: '1. Isian &amp; PDF', Arsip: '1. Isian &amp; PDF Arsip' };
+  /* v6.2: tab cukup "Isian Data" (+ "Unggah TTE" khusus model TTE). Arsip & Langsung: satu halaman. */
+  const tabs = model === 'TTE' ? [['isian', '1. Isian Data'], ['tte', '2. Unggah TTE']] : [];
+  const awal = model === 'Langsung' ? 'selesai' : (model === 'TTE' && initialTab === 'tte' ? 'tte' : 'isian');
+  workspaceState = { layananId, activeTab: awal, canEdit: d.canEdit };
 
   document.getElementById('pageTitle').textContent = 'Service Workspace — ' + d.layanan.ID;
   const tahap = d.layanan.Status === 'Selesai' ? 'Selesai' : (d.layanan.TahapBO || 'Isian');
 
   container.innerHTML = `
-    <button class="btn btn-link ps-0 mb-2 text-decoration-none" onclick="navigateTo('backoffice')"><i class="bi bi-arrow-left"></i> Kembali ke Back Office</button>
-    <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
+    <button class="btn btn-link ps-0 mb-2 text-decoration-none" onclick="navigateTo('backoffice')"><i class="bi bi-arrow-left"></i> Back Office</button>
+    <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
       <div>
         <h2 class="page-heading mb-0">${escapeHtml(d.katalog ? d.katalog.NamaLayanan : d.layanan.JenisLayanan)} <span class="text-secondary fw-normal">#${escapeHtml(d.layanan.ID)}</span></h2>
-        <div class="small text-secondary">${escapeHtml(d.layanan.PemohonNama)}${d.pemohon && d.pemohon.NoHP ? ' · ' + escapeHtml(d.pemohon.NoHP) : ''}</div>
+        <div class="small text-secondary">${escapeHtml(namaKapital(d.layanan.PemohonNama))}${d.pemohon && d.pemohon.NoHP ? ' · ' + escapeHtml(d.pemohon.NoHP) : ''}</div>
       </div>
-      <div class="text-end"><span class="badge-status ${(BO_TAHAP[tahap] || BO_TAHAP.Isian).cls}">${tahap}</span>
-        <div class="small mt-1"><span class="badge-status badge-model">Model: ${escapeHtml(MODEL_LABEL[model])}</span></div></div>
+      <div class="d-flex align-items-center gap-2 flex-wrap">
+        <button class="btn btn-labuku-outline btn-sm-pill" id="wsPetunjukBtn" onclick="bukaPetunjuk()"><i class="bi bi-journal-text"></i> Petunjuk</button>
+        <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span>
+        <span class="badge-status ${(BO_TAHAP[tahap] || BO_TAHAP.Isian).cls}">${tahap}</span>
+      </div>
     </div>
-
-    <div class="doc-tab-nav">
-      ${model === 'Langsung' ? '' : `<div class="doc-tab-link active" data-tab="isian" onclick="switchWorkspaceTab('isian')">${TAB_ISIAN[model]}</div>`}
-      <div class="doc-tab-link ${model === 'Langsung' ? 'active' : ''}" data-tab="tte" onclick="switchWorkspaceTab('tte')">${TAB_HASIL[model]}</div>
-      <div class="doc-tab-link" data-tab="knowledge" onclick="switchWorkspaceTab('knowledge')">SOP / WI / Template</div>
-      <div class="doc-tab-link" data-tab="eksternal" onclick="switchWorkspaceTab('eksternal')">Link Eksternal</div>
-    </div>
-
+    ${tabs.length ? `<div class="doc-tab-nav">${tabs.map(([k, lb]) => `<div class="doc-tab-link ${k === awal ? 'active' : ''}" data-tab="${k}" onclick="switchWorkspaceTab('${k}')">${lb}</div>`).join('')}</div>` : ''}
     <div id="wsTabContent"></div>
+    <div class="petunjuk-overlay" id="petunjukOverlay" onclick="tutupPetunjuk()"></div>
+    <aside class="petunjuk-panel" id="petunjukPanel" aria-label="Petunjuk teknis"></aside>
   `;
   window._wsData = d;
-  if (initialTab === 'hasil' || (model === 'Langsung' && (!initialTab || initialTab === 'isian'))) initialTab = 'tte';
-  if (initialTab && initialTab !== 'isian') switchWorkspaceTab(initialTab);
-  else renderWorkspaceTab('isian');
+  renderWorkspaceTab(awal);
 }
 
 function switchWorkspaceTab(tab) {
@@ -1828,10 +1903,73 @@ function renderWorkspaceTab(tab) {
   const d = window._wsData;
   const target = document.getElementById('wsTabContent');
   if (!target || !d) return;
-  if (tab === 'isian') target.innerHTML = buildWorkspaceIsianTab(d);
-  else if (tab === 'knowledge') target.innerHTML = buildWorkspaceKnowledgeTab(d);
-  else if (tab === 'eksternal') target.innerHTML = buildWorkspaceEksternalTab(d);
-  else if (tab === 'tte') target.innerHTML = buildWorkspaceTteTab(d);
+  if (tab === 'tte' && d.model === 'TTE') target.innerHTML = buildWorkspaceTteTab(d);
+  else if (tab === 'selesai' || d.model === 'Langsung') target.innerHTML = buildWorkspaceSelesaiTab(d);
+  else target.innerHTML = buildWorkspaceIsianTab(d);
+}
+
+/* ---------- v6.2: Petunjuk Teknis (teks per layanan) di panel samping ---------- */
+function teksPetunjukHtml(teks) {
+  const t = String(teks || '').trim();
+  if (!t) return '<p class="small text-secondary mb-0">Belum ada petunjuk teknis untuk layanan ini.</p>';
+  return t.split(NL).map(baris => {
+    const b = baris.trim();
+    if (!b) return '<div class="pt-gap"></div>';
+    if (/^#\s*/.test(b)) return '<div class="pt-judul">' + escapeHtml(b.replace(/^#+\s*/, '')) + '</div>';
+    if (/^[-*•]\s+/.test(b)) return '<div class="pt-butir"><i class="bi bi-dot"></i><span>' + escapeHtml(b.replace(/^[-*•]\s+/, '')) + '</span></div>';
+    return '<p class="pt-p">' + escapeHtml(b) + '</p>';
+  }).join('');
+}
+
+function bukaPetunjuk(modeEdit) {
+  const d = window._wsData;
+  const panel = document.getElementById('petunjukPanel');
+  if (!d || !panel) return;
+  const k = d.katalog || {};
+  const dok = (d.knowledge || []).filter(x => !x.KatalogID && (x.Tipe === 'SOP' || x.Tipe === 'Regulasi'));
+  panel.innerHTML = `
+    <div class="d-flex justify-content-between align-items-center mb-2">
+      <h6 class="fw-bold mb-0"><i class="bi bi-journal-text"></i> Petunjuk Teknis</h6>
+      <button class="btn btn-icon" onclick="tutupPetunjuk()" title="Tutup"><i class="bi bi-x-lg"></i></button>
+    </div>
+    <div class="small text-secondary mb-3">${escapeHtml(k.NamaLayanan || d.layanan.JenisLayanan)}</div>
+    ${modeEdit ? `
+      <textarea class="form-control mb-2" id="petunjukTeks" rows="14" placeholder="Tulis langkah kerja. Baris diawali # = judul, - = butir.">${escapeHtml(k.Juknis || '')}</textarea>
+      <div class="d-flex gap-2"><button class="btn btn-labuku-primary flex-fill" id="petunjukSimpanBtn" onclick="simpanPetunjuk()">Simpan</button>
+        <button class="btn btn-labuku-outline" onclick="bukaPetunjuk(false)">Batal</button></div>`
+    : `<div class="petunjuk-isi">${teksPetunjukHtml(k.Juknis)}</div>
+      ${k.ID ? '<button class="btn btn-labuku-outline btn-sm-pill mt-3 admin-only" onclick="bukaPetunjuk(true)"><i class="bi bi-pencil"></i> Edit petunjuk</button>' : ''}`}
+    ${dok.length ? `<div class="mt-4"><div class="fw-semibold small mb-1">SOP &amp; Regulasi</div>${dok.map(x => `
+      <a class="d-block small py-1" href="javascript:void(0)" onclick="bukaDokumenKnowledge('${escapeHtml(x.LinkURL || '')}')"><i class="bi bi-file-earmark-pdf"></i> ${escapeHtml(x.NamaDokumen)}</a>`).join('')}</div>` : ''}`;
+  panel.classList.add('show');
+  document.getElementById('petunjukOverlay').classList.add('show');
+}
+
+function tutupPetunjuk() {
+  const p = document.getElementById('petunjukPanel');
+  if (p) p.classList.remove('show');
+  const o = document.getElementById('petunjukOverlay');
+  if (o) o.classList.remove('show');
+}
+
+/** Optimistic: teks langsung tampil; disimpan di latar belakang, dikembalikan bila gagal. */
+function simpanPetunjuk() {
+  const d = window._wsData;
+  if (!d || !d.katalog) return;
+  const teks = document.getElementById('petunjukTeks').value.replace(CR_RE, '');
+  const lama = d.katalog.Juknis || '';
+  const setLokal = (v) => {
+    d.katalog.Juknis = v;
+    const L = katalogLengkap();
+    const k = L ? L.katalog.find(x => x.ID === d.katalog.ID) : null;
+    if (k) { k.Juknis = v; saveAppStateCache(); }
+  };
+  setLokal(teks);
+  bukaPetunjuk(false);
+  gsr(res => {
+    if (!res || !res.success) { setLokal(lama); if (window._wsData === d) bukaPetunjuk(false); showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+    showToast('Berhasil', 'Petunjuk teknis disimpan.', 'success');
+  }, err => { setLokal(lama); showToast('Error', err.message || err, 'danger'); }).simpanJuknis(d.katalog.ID, teks);
 }
 
 function dokumenByKategori(d, kat) {
@@ -1857,42 +1995,58 @@ function dokumenListHtml(list, emptyText) {
     </div>`).join('');
 }
 
-/** Tab 1: field isian surat (diatur per layanan di Katalog) + data pemohon otomatis → PDF. */
+/** v6.2: field isian sesuai pengaturan Katalog — jenis (teks/tanggal/pilihan/angka/panjang) & lebar (penuh/½/⅓). */
+const LEBAR_KOLOM = { penuh: 'col-12', setengah: 'col-md-6', sepertiga: 'col-md-4' };
+function inputFieldHtml(f, i, nilai, terkunci) {
+  const attr = `class="form-control isian-field" data-field="${escapeHtml(f.nama)}" data-jenis="${f.jenis}" id="isian_${i}" ${terkunci ? 'disabled' : ''}`;
+  if (f.jenis === 'panjang') return `<textarea ${attr} rows="3">${escapeHtml(nilai)}</textarea>`;
+  if (f.jenis === 'pilihan') {
+    const ops = (f.pilihan || []).slice();
+    if (nilai && ops.indexOf(nilai) === -1) ops.unshift(nilai);
+    return `<select ${attr.replace('form-control', 'form-select')}><option value="">Pilih...</option>${ops.map(o => `<option ${o === nilai ? 'selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select>`;
+  }
+  if (f.jenis === 'tanggal') return `<input type="date" ${attr} value="${/^\d{4}-\d{2}-\d{2}$/.test(nilai) ? escapeHtml(nilai) : ''}">`;
+  if (f.jenis === 'angka') return `<input type="text" inputmode="numeric" ${attr} value="${escapeHtml(nilai)}">`;
+  return `<input type="text" ${attr} value="${escapeHtml(nilai)}">`;
+}
+
 function buildWorkspaceIsianTab(d) {
-  const fields = d.fields || [];
+  const specs = d.fieldSpecs || (d.fields || []).map(n => ({ nama: n, jenis: 'teks', lebar: 'penuh' }));
   const isian = d.isian || {};
   const auto = d.autoData || {};
-  const KAT_DOK = { TTE: 'Draft', PDF: 'Hasil', Arsip: 'Arsip' };
-  const JUDUL_DOK = { TTE: 'PDF Draft (untuk di-TTE)', PDF: 'PDF Hasil (dikirim ke pemohon)', Arsip: 'PDF Arsip (tidak dikirim)' };
-  const LANJUT = { TTE: 'Lanjut: Unggah PDF ber-TTE', PDF: 'Lanjut: Kirim hasil via WA', Arsip: 'Lanjut: Selesaikan layanan' };
-  const drafts = dokumenByKategori(d, KAT_DOK[d.model] || 'Draft');
+  const arsip = d.model === 'Arsip';
+  const drafts = dokumenByKategori(d, arsip ? 'Arsip' : 'Draft');
   const selesai = d.layanan.Status === 'Selesai';
   return `
     <div class="row g-3">
-      <div class="col-lg-7">
+      <div class="col-xl-8">
         <div class="lb-card mb-3">
-          <h6 class="fw-bold mb-1">Field Isian Surat</h6>
-          <p class="small text-secondary mb-3">${d.template
-            ? 'Template: <strong>' + escapeHtml(d.template.NamaDokumen) + '</strong> (Google Docs). Penanda di template diganti isian berikut — klik penanda untuk menyalinnya.'
-            : '<span class="text-danger">Template Google Docs untuk layanan ini belum ada di Katalog (Tipe: Template).</span> PDF yang dibuat berupa ringkasan isian.'}</p>
-          ${fields.length === 0 ? '<p class="small text-secondary">Field isian belum diatur. Tambahkan di menu Katalog Layanan → pilih layanan → Edit Layanan → "Field isian surat" (satu per baris).</p>' : ''}
+          <div class="d-flex justify-content-between align-items-center flex-wrap gap-2 mb-3">
+            <h6 class="fw-bold mb-0">Isian Data</h6>
+            <span class="small ${d.template ? 'text-secondary' : 'text-danger'}">${d.template ? '<i class="bi bi-file-earmark-text"></i> ' + escapeHtml(d.template.NamaDokumen) : 'Template belum ada — PDF berupa ringkasan'}</span>
+          </div>
+          ${specs.length === 0 ? '<p class="small text-secondary">Field belum diatur di Katalog Layanan.</p>' : ''}
           <form id="isianForm" onsubmit="event.preventDefault(); simpanIsianPdf();">
-            ${fields.map((f, i) => `
-              <div class="mb-2"><label class="form-label d-flex justify-content-between align-items-center gap-2">${escapeHtml(f)} ${chipSalin(f)}</label>
-                <input type="text" class="form-control isian-field" data-field="${escapeHtml(f)}" id="isian_${i}" value="${escapeHtml(isian[f] !== undefined ? isian[f] : (auto[f] !== undefined ? auto[f] : ''))}" ${selesai ? 'disabled' : ''}></div>`).join('')}
-            <details class="mt-2 mb-3"><summary class="small fw-semibold">Data otomatis (tanpa perlu diisi) — klik penanda untuk menyalin</summary>
+            <div class="row g-3">
+              ${specs.map((f, i) => {
+                const nilai = isian[f.nama] !== undefined ? String(isian[f.nama]) : (auto[f.nama] !== undefined ? String(auto[f.nama]) : '');
+                return `<div class="${LEBAR_KOLOM[f.lebar] || 'col-12'}"><label class="form-label d-flex justify-content-between align-items-center gap-2" for="isian_${i}">${escapeHtml(f.nama)} ${chipSalin(f.nama)}</label>${inputFieldHtml(f, i, nilai, selesai)}</div>`;
+              }).join('')}
+            </div>
+            <details class="mt-3 mb-3"><summary class="small fw-semibold">Data otomatis</summary>
               <div class="small mt-2">${Object.keys(auto).map(k => `<div class="mb-1">${chipSalin(k)} = ${escapeHtml(auto[k] || '-')}</div>`).join('')}</div>
             </details>
             ${selesai ? '' : `<button type="submit" class="btn btn-labuku-primary w-100" id="isianBtn"><i class="bi bi-file-earmark-pdf"></i> Simpan &amp; Buat PDF</button>`}
           </form>
         </div>
       </div>
-      <div class="col-lg-5">
+      <div class="col-xl-4">
         <div class="lb-card mb-3">
-          <h6 class="fw-bold mb-2">${JUDUL_DOK[d.model] || JUDUL_DOK.TTE}</h6>
-          ${dokumenListHtml(drafts, 'Belum ada PDF. Isi field lalu klik "Simpan &amp; Buat PDF".')}
-          ${drafts.length && !selesai ? '<button class="btn btn-labuku-outline w-100 mt-3" onclick="switchWorkspaceTab(&#39;tte&#39;)">' + (LANJUT[d.model] || LANJUT.TTE) + ' <i class="bi bi-arrow-right"></i></button>' : ''}
+          <h6 class="fw-bold mb-2">${arsip ? 'PDF Arsip' : 'PDF Draft'}</h6>
+          ${dokumenListHtml(drafts, 'Belum ada PDF.')}
+          ${drafts.length && !selesai && !arsip ? '<button class="btn btn-labuku-outline w-100 mt-3" onclick="switchWorkspaceTab(&#39;tte&#39;)">Unggah TTE <i class="bi bi-arrow-right"></i></button>' : ''}
         </div>
+        ${arsip ? kartuSelesaiHtml(d, { siap: drafts.length > 0 || specs.length === 0, syarat: 'Buat PDF arsip dulu.' }) : ''}
         <div class="lb-card">
           <h6 class="fw-bold mb-3">Log Aktivitas</h6>
           ${d.jejak.length === 0 ? '<p class="small text-secondary mb-0">Belum ada aktivitas.</p>' : d.jejak.slice(0, 8).map(j => `
@@ -1901,6 +2055,22 @@ function buildWorkspaceIsianTab(d) {
             </div>`).join('')}
         </div>
       </div>
+    </div>`;
+}
+
+/** v6.2: kartu penyelesaian — selesai SELALU disertai WA (opsi tanpa WA dihapus). */
+function kartuSelesaiHtml(d, opt) {
+  const selesai = d.layanan.Status === 'Selesai';
+  const hp = d.pemohon ? d.pemohon.NoHP : '';
+  const siap = !!opt.siap;
+  return `
+    <div class="lb-card mb-3">
+      <h6 class="fw-bold mb-2"><i class="bi bi-check2-circle"></i> ${selesai ? 'Layanan Selesai' : 'Selesaikan'}</h6>
+      <p class="small text-secondary mb-2">WA ke ${hp ? escapeHtml(hp) : '<span class="text-danger">nomor belum ada</span>'}${opt.info ? ' · ' + opt.info : ''}</p>
+      ${!siap && !selesai ? `<p class="small text-danger mb-2">${opt.syarat}</p>` : ''}
+      ${selesai
+        ? `<button class="btn btn-labuku-accent w-100" ${siap ? '' : 'disabled'} onclick="kirimWaHasil()"><i class="bi bi-whatsapp"></i> Kirim Ulang WA</button>`
+        : `<button class="btn btn-labuku-primary w-100 py-2" id="wsSelesaiBtn" ${siap ? '' : 'disabled'} onclick="selesaiDanKirimWa()"><i class="bi bi-whatsapp"></i> Selesai &amp; Kirim WA</button>`}
     </div>`;
 }
 
@@ -1922,7 +2092,7 @@ function unduhPdfBase64(b64, nama) {
 
 function simpanIsianPdf() {
   const values = {};
-  document.querySelectorAll('#isianForm .isian-field').forEach(el => { values[el.dataset.field] = el.value.trim(); });
+  document.querySelectorAll('#isianForm .isian-field').forEach(el => { values[el.dataset.field] = String(el.value || '').trim(); });
   const btn = document.getElementById('isianBtn');
   if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-inline"></span> Membuat PDF...'; }
   const layananId = workspaceState.layananId;
@@ -1930,10 +2100,12 @@ function simpanIsianPdf() {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf"></i> Simpan &amp; Buat PDF'; }
     if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
     const b = (window.AppState.bo || []).find(x => x.ID === layananId);
-    if (b) { b.TahapBO = res.data && res.data.model && res.data.model !== 'TTE' ? 'Siap Kirim' : 'Menunggu TTE'; saveAppStateCache(); }
+    const tte = !(res.data && res.data.model && res.data.model !== 'TTE');
+    if (b) { b.TahapBO = tte ? 'Menunggu TTE' : 'Siap Kirim'; saveAppStateCache(); }
     const unduh = unduhPdfBase64(res.data && res.data.pdfBase64, res.data && res.data.fileName);
-    showToast('Berhasil', res.message + (unduh ? ' PDF otomatis diunduh.' : ' Unduh lewat tombol di daftar PDF.'), 'success');
-    loadServiceWorkspace(layananId, 'isian');
+    showToast('Berhasil', res.message + (unduh ? ' PDF otomatis diunduh.' : ''), 'success');
+    /* v6.2: model TTE → otomatis pindah ke tab Unggah TTE. */
+    loadServiceWorkspace(layananId, tte ? 'tte' : 'isian');
   }, err => {
     if (btn) { btn.disabled = false; btn.innerHTML = '<i class="bi bi-file-earmark-pdf"></i> Simpan &amp; Buat PDF'; }
     showToast('Error', err.message || err, 'danger');
@@ -1949,181 +2121,42 @@ function latestHasilPdf(d) {
   return lama.length ? lama[lama.length - 1] : null;
 }
 
-/** Tab 2 sesuai model: TTE (unggah bila dikirim WA) · PDF (kirim tautan) · Arsip/Langsung (WA selesai tanpa PDF). */
+/** Tab 2 (model TTE): unggah PDF ber-TTE → Selesai & Kirim WA (berisi tautan PDF). */
 function buildWorkspaceTteTab(d) {
-  if (d.model === 'PDF' || d.model === 'Arsip' || d.model === 'Langsung') return buildWorkspaceSelesaiTab(d);
   const pdf = latestHasilPdf(d);
   const selesai = d.layanan.Status === 'Selesai';
-  const hp = d.pemohon ? d.pemohon.NoHP : '';
   return `
     <div class="row g-3">
-      <div class="col-lg-6">
+      <div class="col-lg-7">
         <div class="lb-card mb-3">
           <h6 class="fw-bold mb-2"><i class="bi bi-cloud-upload"></i> Unggah PDF ber-TTE</h6>
-          <p class="small text-secondary">Unduh PDF draft di tab 1, tandatangani (TTE/SRIKANDI). Unggah di sini <b>hanya bila hasil akan dikirim via WA</b>; bila tidak, cukup "Selesai tanpa WA". Hanya PDF, maks 10MB.</p>
           <label class="dropzone mb-2 ${selesai ? 'disabled' : ''}" id="wsDrop" for="wsFileInput"
             ondragover="event.preventDefault();this.classList.add('over')" ondragleave="this.classList.remove('over')" ondrop="dropPdfTte(event)">
             <i class="bi bi-file-earmark-arrow-up"></i>
-            <span class="dz-teks" id="wsDropTeks">Seret &amp; lepas PDF ber-TTE di sini, atau klik untuk memilih file</span>
+            <span class="dz-teks" id="wsDropTeks">Seret PDF ke sini, atau klik untuk memilih (maks. 10MB)</span>
             <input type="file" class="dz-input" id="wsFileInput" accept="application/pdf,.pdf" ${selesai ? 'disabled' : ''} onchange="tampilNamaPdf()">
           </label>
-          <button class="btn btn-labuku-primary w-100" id="wsUploadBtn" onclick="uploadWorkspaceFile()" ${selesai ? 'disabled' : ''}><i class="bi bi-upload"></i> Unggah PDF TTE</button>
+          <button class="btn btn-labuku-primary w-100" id="wsUploadBtn" onclick="uploadWorkspaceFile()" ${selesai ? 'disabled' : ''}><i class="bi bi-upload"></i> Unggah</button>
         </div>
         <div class="lb-card">
           <h6 class="fw-bold mb-2">PDF ber-TTE</h6>
-          ${dokumenListHtml(dokumenByKategori(d, 'TTE').concat(dokumenByKategori(d, 'Hasil')), 'Belum ada PDF ber-TTE yang diunggah.')}
+          ${dokumenListHtml(dokumenByKategori(d, 'TTE').concat(dokumenByKategori(d, 'Hasil')), 'Belum ada.')}
         </div>
       </div>
-      <div class="col-lg-6">
-        <div class="lb-card">
-          <h6 class="fw-bold mb-2"><i class="bi bi-check2-circle"></i> ${selesai ? 'Layanan Selesai' : 'Selesaikan Layanan'}</h6>
-          ${pdf ? `<p class="small mb-2">PDF untuk pemohon: <strong>${escapeHtml(pdf.NamaFile)}</strong></p>` : '<p class="small text-danger mb-2">Kirim WA: unggah PDF ber-TTE terlebih dahulu. Tanpa WA: langsung "Selesai tanpa WA".</p>'}
-          <p class="small text-secondary">WhatsApp ke: ${hp ? escapeHtml(hp) : '<span class="text-danger">nomor pemohon belum ada</span>'}. Pesan berisi tautan PDF yang bisa dibuka &amp; diunduh pemohon (siapa pun yang memegang tautan dapat membukanya).</p>
-          ${selesai
-            ? `<button class="btn btn-labuku-accent w-100" ${pdf ? '' : 'disabled'} onclick="kirimWaHasil()"><i class="bi bi-whatsapp"></i> Kirim Ulang WA</button>`
-            : `<button class="btn btn-labuku-primary w-100 py-2" ${pdf ? '' : 'disabled'} onclick="selesaiDanKirimWa()"><i class="bi bi-whatsapp"></i> Selesai &amp; Kirim WA</button>
-               <button class="btn btn-labuku-outline w-100 mt-2" onclick="selesaikanLayananUI('${d.layanan.ID}')"><i class="bi bi-check-circle"></i> Selesai tanpa WA</button>`}
-        </div>
+      <div class="col-lg-5">
+        ${kartuSelesaiHtml(d, { siap: !!pdf, syarat: 'Unggah PDF ber-TTE dulu.', info: pdf ? 'berisi tautan ' + escapeHtml(pdf.NamaFile) : '' })}
       </div>
     </div>`;
 }
 
-function buildWorkspaceKnowledgeTab(d) {
-  if (d.knowledge.length === 0) return emptyState('bi-journal-x', 'Belum ada SOP/WI/Template untuk layanan ini.');
-  return `
-    <div class="table-wrap">
-      <table class="lb-table">
-        <thead><tr><th>Kode</th><th>Nama Dokumen</th><th>Tipe</th><th>Tgl. Efektif</th><th></th></tr></thead>
-        <tbody>
-          ${d.knowledge.map(k => `
-            <tr>
-              <td>${escapeHtml(k.KodeDokumen)}</td>
-              <td>${escapeHtml(k.NamaDokumen)}</td>
-              <td><span class="badge-status badge-netral">${escapeHtml(labelTipe(k.Tipe))}</span></td>
-              <td>${escapeHtml(fmtDate(k.TglEfektif))}</td>
-              <td style="text-align:right;"><i class="bi bi-download text-secondary" style="cursor:pointer;" title="Buka Dokumen" onclick="bukaDokumenKnowledge('${escapeHtml(k.LinkURL || '')}')"></i></td>
-            </tr>`).join('')}
-        </tbody>
-      </table>
-    </div>
-  `;
-}
-
-/* v5: Link eksternal bersama (semua layanan) — buka, tambah, edit, hapus langsung di Workspace. */
-function linksSaatIni() { return ((window.AppState.config && window.AppState.config.links) || []).slice(); }
-
-function buildWorkspaceEksternalTab(d) {
-  const links = linksSaatIni();
-  return `
-    <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2">
-      <span class="small text-secondary">Link berlaku untuk semua layanan. Perubahan langsung tersimpan untuk seluruh tim.</span>
-      <button class="btn btn-labuku-primary btn-sm-pill" onclick="formLinkEksternal(-1)"><i class="bi bi-plus-lg"></i> Tambah Link</button>
-    </div>
-    <div id="linkFormBox"></div>
-    <div class="row g-3">
-      ${links.length === 0 ? `<div class="col-12">${emptyState('bi-link-45deg', 'Belum ada link. Klik "Tambah Link".')}</div>` : links.map((l, i) => `
-      <div class="col-md-6 col-xl-4">
-        <div class="lb-card h-100 d-flex flex-column">
-          <div class="d-flex justify-content-between align-items-start gap-2">
-            <h6 class="fw-bold mb-1"><i class="bi bi-box-arrow-up-right"></i> ${escapeHtml(l.nama)}</h6>
-            <div class="d-flex gap-1">
-              <button class="btn btn-sm btn-labuku-outline" title="Edit" onclick="formLinkEksternal(${i})"><i class="bi bi-pencil"></i></button>
-              <button class="btn btn-sm btn-labuku-outline" title="Hapus" onclick="hapusLinkEksternal(${i})"><i class="bi bi-trash text-danger"></i></button>
-            </div>
-          </div>
-          <p class="small text-secondary mb-2 flex-grow-1">${escapeHtml(l.ket || '')}<span class="d-block text-truncate" style="opacity:.7">${escapeHtml(l.url)}</span></p>
-          <a href="${escapeHtml(l.url)}" target="_blank" rel="noopener" class="btn btn-labuku-outline w-100">Buka ${escapeHtml(l.nama)}</a>
-        </div>
-      </div>`).join('')}
-    </div>
-  `;
-}
-
-function formLinkEksternal(i) {
-  const l = i >= 0 ? linksSaatIni()[i] : { nama: '', url: '', ket: '' };
-  const box = document.getElementById('linkFormBox');
-  if (!box || !l) return;
-  box.innerHTML = `
-    <div class="lb-card mb-3">
-      <div class="row g-2 align-items-end">
-        <div class="col-md-3"><label class="form-label">Nama</label><input class="form-control" id="lkNama" maxlength="60" value="${escapeHtml(l.nama)}" placeholder="mis. SIMAS"></div>
-        <div class="col-md-5"><label class="form-label">URL</label><input class="form-control" id="lkUrl" value="${escapeHtml(l.url)}" placeholder="awali dengan https:"></div>
-        <div class="col-md-4"><label class="form-label">Keterangan <span class="text-secondary fw-normal">(opsional)</span></label><input class="form-control" id="lkKet" maxlength="120" value="${escapeHtml(l.ket || '')}"></div>
-      </div>
-      <div class="d-flex gap-2 mt-2">
-        <button class="btn btn-labuku-primary btn-sm-pill" onclick="simpanLinkUI(${i})"><i class="bi bi-save"></i> Simpan</button>
-        <button class="btn btn-labuku-outline btn-sm-pill" onclick="document.getElementById('linkFormBox').innerHTML=''">Batal</button>
-      </div>
-    </div>`;
-  document.getElementById('lkNama').focus();
-}
-
-function simpanLinkUI(i) {
-  const item = { nama: document.getElementById('lkNama').value.trim(), url: document.getElementById('lkUrl').value.trim(), ket: document.getElementById('lkKet').value.trim() };
-  if (!item.nama || !/^https?:/i.test(item.url)) { showToast('Peringatan', 'Isi nama dan URL yang diawali http: atau https:', 'warning'); return; }
-  const list = linksSaatIni();
-  if (i >= 0) list[i] = item; else list.push(item);
-  kirimLinkEksternal(list);
-}
-
-function hapusLinkEksternal(i) {
-  const list = linksSaatIni();
-  const l = list[i];
-  if (!l) return;
-  confirmAction('Hapus link?', 'Link "' + l.nama + '" akan dihapus untuk semua layanan.', () => { list.splice(i, 1); kirimLinkEksternal(list); });
-}
-
-/** Optimistic: tampilan langsung berubah, disimpan di latar belakang, dikembalikan bila gagal. */
-function kirimLinkEksternal(list) {
-  const lama = linksSaatIni();
-  window.AppState.config.links = list;
-  saveAppStateCache();
-  if (workspaceState.activeTab === 'eksternal') renderWorkspaceTab('eksternal');
-  gsr(res => {
-    if (!res || !res.success) {
-      window.AppState.config.links = lama; saveAppStateCache();
-      if (workspaceState.activeTab === 'eksternal') renderWorkspaceTab('eksternal');
-      showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
-      return;
-    }
-    window.AppState.config.links = res.data; saveAppStateCache();
-    showToast('Berhasil', 'Link eksternal disimpan.', 'success');
-  }, err => {
-    window.AppState.config.links = lama; saveAppStateCache();
-    if (workspaceState.activeTab === 'eksternal') renderWorkspaceTab('eksternal');
-    showToast('Error', err.message || err, 'danger');
-  }).simpanLinkEksternal(list);
-}
-
-/** Tab "Kirim Hasil / Selesaikan" untuk model PDF (tautan PDF), Arsip & Langsung (WA selesai tanpa PDF). */
+/** Model Langsung (biasanya sudah selesai di Front Office). */
 function buildWorkspaceSelesaiTab(d) {
-  const selesai = d.layanan.Status === 'Selesai';
-  const hp = d.pemohon ? d.pemohon.NoHP : '';
-  const butuhPdf = d.model === 'PDF';
-  const pdf = butuhPdf ? latestHasilPdf(d) : null;
-  const arsip = dokumenByKategori(d, 'Arsip');
-  const info = d.model === 'PDF'
-    ? (pdf ? `<p class="small mb-2">PDF hasil (tanpa TTE) yang dikirim: <strong>${escapeHtml(pdf.NamaFile)}</strong></p>` : '<p class="small text-danger mb-2">Buat PDF hasil di tab 1 terlebih dahulu.</p>')
-    : d.model === 'Arsip'
-      ? (arsip.length ? `<p class="small mb-2">PDF arsip tersimpan: <strong>${escapeHtml(arsip[arsip.length - 1].NamaFile)}</strong> (tidak dikirim ke pemohon).</p>` : '<p class="small text-warning mb-2">Belum ada PDF arsip. Disarankan isi field &amp; buat PDF di tab 1 sebelum menyelesaikan.</p>')
-      : '<p class="small mb-2">Layanan tanpa isian (mis. legalisir). Biasanya sudah diselesaikan di Front Office.</p>';
-  const ket = d.model === 'PDF' ? 'Pesan berisi tautan PDF yang bisa dibuka &amp; diunduh pemohon.' : 'Pesan pemberitahuan layanan selesai (tanpa PDF).';
   return `
     <div class="row g-3">
+      <div class="col-lg-6">${kartuSelesaiHtml(d, { siap: true, syarat: '' })}</div>
       <div class="col-lg-6">
         <div class="lb-card">
-          <h6 class="fw-bold mb-2"><i class="bi bi-check2-circle"></i> ${selesai ? 'Layanan Selesai' : 'Selesaikan Layanan'}</h6>
-          ${info}
-          <p class="small text-secondary">WhatsApp ke: ${hp ? escapeHtml(hp) : '<span class="text-danger">nomor pemohon belum ada</span>'}. ${ket}</p>
-          ${selesai
-            ? `<button class="btn btn-labuku-accent w-100" ${butuhPdf && !pdf ? 'disabled' : ''} onclick="kirimWaHasil()"><i class="bi bi-whatsapp"></i> Kirim Ulang WA</button>`
-            : `<button class="btn btn-labuku-primary w-100 py-2" ${butuhPdf && !pdf ? 'disabled' : ''} onclick="selesaiDanKirimWa()"><i class="bi bi-whatsapp"></i> Selesai &amp; Kirim WA</button>
-               <button class="btn btn-labuku-outline w-100 mt-2" onclick="selesaikanLayananUI('${d.layanan.ID}')"><i class="bi bi-check-circle"></i> Selesai tanpa WA</button>`}
-        </div>
-      </div>
-      <div class="col-lg-6">
-        <div class="lb-card">
-          <h6 class="fw-bold mb-2">Dokumen layanan</h6>
+          <h6 class="fw-bold mb-2">Dokumen</h6>
           ${dokumenListHtml((d.dokumen || []).slice().sort((a, b) => new Date(a.WaktuUpload) - new Date(b.WaktuUpload)), 'Belum ada dokumen.')}
         </div>
       </div>
@@ -2131,7 +2164,7 @@ function buildWorkspaceSelesaiTab(d) {
 }
 
 function pesanWaHasil(d, pdf) {
-  const KEY = { TTE: 'wa_tte', PDF: 'wa_pdf', Arsip: 'wa_arsip', Langsung: 'wa_langsung' };
+  const KEY = { TTE: 'wa_tte', Arsip: 'wa_arsip', Langsung: 'wa_langsung' };
   return isiTpl(waTpl(KEY[d.model] || 'wa_tte'), {
     nama: d.layanan.PemohonNama || '', layanan: d.layanan.JenisLayanan, id: d.layanan.ID, instansi: instansiNama(),
     tanggal: tglPanjang(), link: pdf ? pdf.FileURL : ''
@@ -2143,7 +2176,7 @@ function butuhPdfWa(d) { return d.model !== 'Arsip' && d.model !== 'Langsung'; }
 function kirimWaHasil() {
   const d = window._wsData;
   const pdf = d ? latestHasilPdf(d) : null;
-  if (d && butuhPdfWa(d) && !pdf) { showToast('Peringatan', d.model === 'PDF' ? 'Buat PDF hasil terlebih dahulu.' : 'Unggah PDF ber-TTE terlebih dahulu.', 'warning'); return; }
+  if (d && butuhPdfWa(d) && !pdf) { showToast('Peringatan', 'Unggah PDF ber-TTE terlebih dahulu.', 'warning'); return; }
   openWa(d.pemohon ? d.pemohon.NoHP : '', pesanWaHasil(d, pdf));
 }
 
@@ -2161,17 +2194,17 @@ function selesaiDanKirimWa() {
   const d = window._wsData;
   if (!d) return;
   const pdf = latestHasilPdf(d);
-  if (butuhPdfWa(d) && !pdf) { showToast('Peringatan', d.model === 'PDF' ? 'Buat PDF hasil terlebih dahulu.' : 'Unggah PDF ber-TTE terlebih dahulu.', 'warning'); return; }
+  if (butuhPdfWa(d) && !pdf) { showToast('Peringatan', 'Unggah PDF ber-TTE terlebih dahulu.', 'warning'); return; }
   if (!openWa(d.pemohon ? d.pemohon.NoHP : '', pesanWaHasil(d, butuhPdfWa(d) ? pdf : null))) return;
   const layananId = d.layanan.ID;
   const prevStatus = d.layanan.Status;
   const boBackup = JSON.parse(JSON.stringify(window.AppState.bo || []));
   d.layanan.Status = 'Selesai';
   tandaiBoSelesai(layananId);
-  renderWorkspaceTab('tte');
+  renderWorkspaceTab(workspaceState.activeTab);
   const rollback = (msg) => {
     d.layanan.Status = prevStatus; window.AppState.bo = boBackup; saveAppStateCache();
-    if (window._wsData === d) renderWorkspaceTab('tte');
+    if (window._wsData === d) renderWorkspaceTab(workspaceState.activeTab);
     showToast('Gagal menyimpan status Selesai', msg, 'danger');
   };
   gsr(res => {
@@ -2290,7 +2323,7 @@ function renderKnowledgeShell() {
     <div class="d-flex justify-content-between align-items-start mb-3 flex-wrap gap-2">
       <div>
         <h2 class="page-heading">Katalog Layanan</h2>
-        <p class="page-sub mb-0">Pilih kategori → pilih layanan. SOP &amp; Regulasi dipasang per kategori; Petunjuk Teknis &amp; Template per layanan.</p>
+
       </div>
       <button class="btn btn-labuku-primary admin-only" onclick="openKatalogForm(null, knowledgeActiveKategori)"><i class="bi bi-plus-lg"></i> Tambah Layanan</button>
     </div>
@@ -2392,7 +2425,7 @@ function renderKnowledgeContent(kategori) {
   box.innerHTML = `
     <div class="d-flex justify-content-between align-items-center mb-2 flex-wrap gap-2"><div class="fw-bold">${escapeHtml(kategori)}</div>${tombolTambah}</div>
     <div class="lb-card mb-3">
-      <div class="small text-secondary mb-2"><i class="bi bi-collection"></i> Dokumen kategori — otomatis berlaku untuk semua layanan di kategori ini</div>
+      <div class="small text-secondary mb-2"><i class="bi bi-collection"></i> Dokumen kategori</div>
       <div class="row g-3">${katDocs}</div>
     </div>
     ${urut.length === 0 ? `<div class="lb-card">${emptyState('bi-journal-x', 'Belum ada layanan di kategori ini.')}</div>` : `
@@ -2421,11 +2454,62 @@ function splitLinesClient(v) {
   return out;
 }
 
+/* ---------- v6.2: penyusun field isian (jenis, lebar, pilihan, urutan) ---------- */
+const FIELD_JENIS_LABEL = { teks: 'Teks', tanggal: 'Tanggal', pilihan: 'Pilihan', angka: 'Angka', panjang: 'Teks panjang' };
+const FIELD_LEBAR_LABEL = { penuh: 'Penuh', setengah: '½ baris', sepertiga: '⅓ baris' };
+function fieldSpecsClient(raw) {
+  let arr = raw;
+  if (typeof arr === 'string') { try { arr = JSON.parse(arr || '[]'); } catch (e) { arr = arr ? [arr] : []; } }
+  if (!Array.isArray(arr)) return [];
+  const out = [], ada = {};
+  arr.forEach(item => {
+    const list = (item && typeof item === 'object') ? [item] : String(item == null ? '' : item).split(NL).map(n => ({ nama: n }));
+    list.forEach(f => {
+      const nama = String(f.nama || '').replace(CR_RE, '').trim();
+      if (!nama || ada[nama.toLowerCase()]) return;
+      ada[nama.toLowerCase()] = true;
+      out.push({ nama: nama, jenis: FIELD_JENIS_LABEL[f.jenis] ? f.jenis : 'teks', lebar: FIELD_LEBAR_LABEL[f.lebar] ? f.lebar : 'penuh',
+        pilihan: Array.isArray(f.pilihan) ? f.pilihan.slice() : [] });
+    });
+  });
+  return out;
+}
+
+let fbData = [];
+function fbRender() {
+  const box = document.getElementById('fbList');
+  if (!box) return;
+  if (!fbData.length) box.innerHTML = '<div class="small text-secondary py-2">Belum ada field.</div>';
+  else box.innerHTML = fbData.map((f, i) => `
+    <div class="fb-row">
+      <input class="form-control form-control-sm fb-nama" placeholder="Nama field" value="${escapeHtml(f.nama)}" oninput="fbData[${i}].nama=this.value;fbPratinjau()">
+      <select class="form-select form-select-sm fb-jenis" onchange="fbData[${i}].jenis=this.value;fbRender()">
+        ${Object.keys(FIELD_JENIS_LABEL).map(k => `<option value="${k}" ${k === f.jenis ? 'selected' : ''}>${FIELD_JENIS_LABEL[k]}</option>`).join('')}</select>
+      <select class="form-select form-select-sm fb-lebar" onchange="fbData[${i}].lebar=this.value;fbPratinjau()">
+        ${Object.keys(FIELD_LEBAR_LABEL).map(k => `<option value="${k}" ${k === f.lebar ? 'selected' : ''}>${FIELD_LEBAR_LABEL[k]}</option>`).join('')}</select>
+      <div class="fb-aksi">
+        <button type="button" class="btn btn-sm btn-labuku-outline" title="Naik" ${i === 0 ? 'disabled' : ''} onclick="fbGeser(${i},-1)"><i class="bi bi-arrow-up"></i></button>
+        <button type="button" class="btn btn-sm btn-labuku-outline" title="Turun" ${i === fbData.length - 1 ? 'disabled' : ''} onclick="fbGeser(${i},1)"><i class="bi bi-arrow-down"></i></button>
+        <button type="button" class="btn btn-sm btn-labuku-outline" title="Hapus" onclick="fbData.splice(${i},1);fbRender()"><i class="bi bi-x-lg text-danger"></i></button>
+      </div>
+      ${f.jenis === 'pilihan' ? `<input class="form-control form-control-sm fb-pilihan" placeholder="Isi pilihan, pisahkan dengan koma — mis. Perawan, Janda" value="${escapeHtml((f.pilihan || []).join(', '))}" oninput="fbData[${i}].pilihan=this.value.split(',').map(x=>x.trim()).filter(Boolean)">` : ''}
+    </div>`).join('');
+  fbPratinjau();
+}
+function fbTambah() { fbData.push({ nama: '', jenis: 'teks', lebar: 'penuh', pilihan: [] }); fbRender(); const n = document.querySelectorAll('#fbList .fb-nama'); if (n.length) n[n.length - 1].focus(); }
+function fbGeser(i, arah) { const j = i + arah; if (j < 0 || j >= fbData.length) return; const t = fbData[i]; fbData[i] = fbData[j]; fbData[j] = t; fbRender(); }
+/** Pratinjau tata letak: kotak-kotak selebar field, tersusun seperti di Workspace. */
+function fbPratinjau() {
+  const box = document.getElementById('fbPratinjau');
+  if (!box) return;
+  const isi = fbData.filter(f => String(f.nama).trim());
+  box.innerHTML = isi.length ? '<div class="row g-1">' + isi.map(f => `<div class="${LEBAR_KOLOM[f.lebar] === 'col-12' ? 'col-12' : (f.lebar === 'setengah' ? 'col-6' : 'col-4')}"><div class="fb-kotak">${escapeHtml(f.nama)}<small>${FIELD_JENIS_LABEL[f.jenis]}</small></div></div>`).join('') + '</div>' : '';
+}
+
 const MODEL_PENJELASAN = {
-  TTE: 'Isi field → unduh PDF → tanda tangan (TTE). Unggah PDF ber-TTE hanya bila hasil dikirim via WA.',
-  PDF: 'Isi field → PDF hasil langsung dikirim tautannya via WA (tanpa TTE).',
-  Arsip: 'Isi field → PDF disimpan sebagai arsip (tidak dikirim). Pemohon menerima WA pemberitahuan selesai.',
-  Langsung: 'Tanpa isian (mis. legalisir) → diselesaikan di Front Office: Lengkap → Selesai → WA. Tetap tercatat di riwayat Back Office.'
+  TTE: 'Isi data → PDF → unggah PDF ber-TTE → selesai + WA berisi tautan PDF.',
+  Arsip: 'Isi data → PDF arsip (tanpa TTE) → selesai + WA pemberitahuan.',
+  Langsung: 'Tanpa isian (mis. legalisir) → selesai di Front Office + WA.'
 };
 
 function renderKnowledgeLayanan(katalogId) {
@@ -2436,7 +2520,7 @@ function renderKnowledgeLayanan(katalogId) {
   knowledgeActiveLayanan = katalogId;
   const docsLayanan = L.knowledge.filter(k => k.KatalogID === katalogId);
   const persyaratan = splitLinesClient(l.PersyaratanJSON);
-  const fields = splitLinesClient(l.FieldJSON);
+  const fields = fieldSpecsClient(l.FieldJSON).map(f => f.nama);
   const model = modelOf(l);
   const kartu = (judul, list, tombol, catatan) => `
     <div class="lb-card mb-2">
@@ -2459,22 +2543,50 @@ function renderKnowledgeLayanan(katalogId) {
           <button class="btn btn-labuku-outline btn-sm-pill" title="Hapus layanan" onclick="hapusKatalogUI('${l.ID}')"><i class="bi bi-trash text-danger"></i></button>
         </div>
       </div>
-      <div class="small mb-3"><span class="badge-status badge-model">Model hasil: ${escapeHtml(MODEL_LABEL[model])}</span> <span class="text-secondary">${escapeHtml(MODEL_PENJELASAN[model])}</span></div>
+      <div class="small mb-3"><span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span> <span class="text-secondary">${escapeHtml(MODEL_PENJELASAN[model])}</span></div>
       <div class="row g-3">
         <div class="col-md-6"><div class="fw-semibold small mb-1">Persyaratan</div>
           ${persyaratan.length ? '<ol class="small mb-0 ps-3">' + persyaratan.map(p => `<li>${escapeHtml(p)}</li>`).join('') + '</ol>' : '<div class="small text-secondary">Belum diatur.</div>'}</div>
-        <div class="col-md-6"><div class="fw-semibold small mb-1">Field isian surat <span class="fw-normal text-secondary">— klik untuk menyalin ke template</span></div>
+        <div class="col-md-6"><div class="fw-semibold small mb-1">Field isian <span class="fw-normal text-secondary">— klik untuk menyalin</span></div>
           ${model === 'Langsung' ? '<div class="small text-secondary">Tidak dipakai (model Langsung).</div>' : fields.length ? '<div class="small">' + fields.map(f => chipSalin(f)).join(' ') + '</div>' : '<div class="small text-secondary">Belum diatur.</div>'}
           ${model === 'Langsung' ? '' : `<details class="mt-2"><summary class="small text-secondary">Data otomatis</summary><div class="small mt-1">${DATA_OTOMATIS.map(f => chipSalin(f)).join(' ')}</div></details>`}</div>
       </div>
     </div>
     ${kartu('SOP', sopReg('SOP'), '', 'Dipasang per kategori — kelola di ' + kategoriLink + '.')}
     ${kartu('Regulasi', sopReg('Regulasi'), '', 'Dipasang per kategori — kelola di ' + kategoriLink + '.')}
-    ${kartu('Petunjuk Teknis', docsLayanan.filter(k => k.Tipe === 'Juknis' || k.Tipe === 'WI' || k.Tipe === 'Tutorial'),
-      `<button class="btn btn-sm btn-labuku-outline admin-only" onclick="openKnowledgeForm({ KatalogID: '${l.ID}', Tipe: 'Juknis' })"><i class="bi bi-upload"></i> Tambah</button>`, '')}
+    <div class="lb-card mb-2">
+      <div class="d-flex justify-content-between align-items-center gap-2 mb-2"><h6 class="fw-bold mb-0">Petunjuk Teknis</h6>
+        <button class="btn btn-sm btn-labuku-outline admin-only" onclick="openJuknisForm('${l.ID}')"><i class="bi bi-pencil"></i> Edit</button></div>
+      <div class="petunjuk-isi">${teksPetunjukHtml(l.Juknis)}</div>
+      ${docsLayanan.filter(k => k.Tipe === 'Juknis' || k.Tipe === 'WI' || k.Tipe === 'Tutorial').map(k => docRowHtml(k, true)).join('')}
+    </div>
     ${kartu('Template Surat', docsLayanan.filter(k => k.Tipe === 'Template'),
       `<button class="btn btn-sm btn-labuku-outline admin-only" onclick="openKnowledgeForm({ KatalogID: '${l.ID}', Tipe: 'Template' })"><i class="bi bi-plus-lg"></i> Tambah</button>`,
       'Wajib link Google Docs berisi penanda {{Nama Field}}.')}`;
+}
+
+/** v6.2: edit Petunjuk Teknis (teks) dari Katalog Layanan. */
+function openJuknisForm(id) {
+  const L = katalogLengkap();
+  const k = L ? L.katalog.find(x => x.ID === id) : null;
+  if (!k) return;
+  openFormModal('Petunjuk Teknis — ' + k.NamaLayanan, `
+    <textarea class="form-control" id="juknisTeks" rows="16" placeholder="Tulis langkah kerja. Baris diawali # = judul, - = butir.">${escapeHtml(k.Juknis || '')}</textarea>
+    <button class="btn btn-labuku-primary w-100 mt-3" id="juknisBtn" onclick="simpanJuknisKatalog('${k.ID}')">Simpan</button>`);
+}
+function simpanJuknisKatalog(id) {
+  const L = katalogLengkap();
+  const k = L ? L.katalog.find(x => x.ID === id) : null;
+  if (!k) return;
+  const teks = document.getElementById('juknisTeks').value.replace(CR_RE, '');
+  const lama = k.Juknis || '';
+  k.Juknis = teks; saveAppStateCache();
+  closeFormModal();
+  if (knowledgeActiveLayanan === id) renderKnowledgeLayanan(id);
+  gsr(res => {
+    if (!res || !res.success) { k.Juknis = lama; saveAppStateCache(); if (knowledgeActiveLayanan === id) renderKnowledgeLayanan(id); showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+    showToast('Berhasil', 'Petunjuk teknis disimpan.', 'success');
+  }, err => { k.Juknis = lama; saveAppStateCache(); showToast('Error', err.message || err, 'danger'); }).simpanJuknis(id, teks);
 }
 
 function bukaDokumenKnowledge(url) {
@@ -2503,7 +2615,7 @@ function openKatalogForm(katalog, kategoriDefault) {
   katalog = katalog || {};
   /* Pemisah baris memakai konstanta NL (bukan escape garis-miring), agar tidak diubah pengolah kode Google. */
   const persyaratan = splitLinesClient(katalog.PersyaratanJSON);
-  const fieldIsian = splitLinesClient(katalog.FieldJSON);
+  fbData = fieldSpecsClient(katalog.FieldJSON);
   const kat = katalog.Kategori || kategoriDefault || KATEGORI_LAYANAN_RESMI[0];
   const model = katalog.ID ? modelOf(katalog) : 'TTE';
   openFormModal(katalog.ID ? 'Edit Layanan' : 'Tambah Layanan Baru', `
@@ -2518,24 +2630,31 @@ function openKatalogForm(katalog, kategoriDefault) {
       <div class="col-12"><label class="form-label">Deskripsi</label><textarea class="form-control" id="katFormDeskripsi" rows="2">${escapeHtml(katalog.Deskripsi || '')}</textarea></div>
       <div class="col-12"><label class="form-label">Model hasil layanan</label>
         <select class="form-select" id="katFormModel" onchange="document.getElementById('katFormModelInfo').textContent=MODEL_PENJELASAN[this.value]">
-          ${[['TTE', '1. TTE — isi field → PDF → tanda tangan → (unggah bila kirim WA)'], ['PDF', '2. PDF langsung — isi field → tautan PDF dikirim via WA'], ['Arsip', '3. Arsip — isi field → PDF disimpan saja (mis. konsultasi)'], ['Langsung', '4. Langsung — tanpa isian, selesai di Front Office (mis. legalisir)']]
+          ${[['TTE', 'TTE'], ['Arsip', 'Arsip (tanpa TTE)'], ['Langsung', 'Selesai di Front Office']]
             .map(([v, lb]) => `<option value="${v}" ${v === model ? 'selected' : ''}>${lb}</option>`).join('')}
         </select>
         <div class="small text-secondary mt-1" id="katFormModelInfo">${escapeHtml(MODEL_PENJELASAN[model])}</div></div>
       <div class="col-12"><label class="form-label">Checklist Persyaratan (satu item per baris)</label><textarea class="form-control" id="katFormPersyaratan" rows="4">${escapeHtml(persyaratan.join(NL))}</textarea></div>
-      <div class="col-12"><label class="form-label">Field isian surat (satu per baris — tidak dipakai model Langsung)</label><textarea class="form-control" id="katFormField" rows="4" placeholder="Contoh:${'&#10;'}Nomor Surat${'&#10;'}Nama Wali${'&#10;'}Tempat Akad">${escapeHtml(fieldIsian.join(NL))}</textarea>
-        <div class="small text-secondary mt-1">Tulis di template Google Docs sebagai penanda. Data otomatis (klik untuk menyalin): ${DATA_OTOMATIS.map(f => chipSalin(f)).join(' ')}</div></div>
+      <div class="col-12"><label class="form-label">Field isian</label>
+        <div class="fb-list" id="fbList"></div>
+        <button type="button" class="btn btn-labuku-outline btn-sm-pill mt-2" onclick="fbTambah()"><i class="bi bi-plus-lg"></i> Tambah field</button>
+        <div class="fb-pratinjau mt-2" id="fbPratinjau"></div>
+        <details class="mt-2"><summary class="small text-secondary">Data otomatis</summary><div class="small mt-1">${DATA_OTOMATIS.map(f => chipSalin(f)).join(' ')}</div></details></div>
+      <div class="col-12"><label class="form-label">Petunjuk Teknis</label><textarea class="form-control" id="katFormJuknis" rows="5" placeholder="Baris diawali # = judul, - = butir.">${escapeHtml(katalog.Juknis || '')}</textarea></div>
       <div class="col-md-6"><label class="form-label">Status</label>
         <select class="form-select" id="katFormAktif"><option value="Ya" ${katalog.Aktif !== 'Tidak' ? 'selected' : ''}>Aktif</option><option value="Tidak" ${katalog.Aktif === 'Tidak' ? 'selected' : ''}>Nonaktif</option></select>
       </div>
     </div>
     <button class="btn btn-labuku-primary w-100 mt-4" id="katFormBtn" onclick="submitKatalogForm()">Simpan</button>
   `);
+  fbRender();
 }
 
 function submitKatalogForm() {
   const persyaratanLines = document.getElementById('katFormPersyaratan').value.replace(CR_RE, '').split(NL).map(s => s.trim()).filter(Boolean);
-  const fieldLines = document.getElementById('katFormField').value.replace(CR_RE, '').split(NL).map(s => s.trim()).filter(Boolean);
+  const fieldSpecs = fbData.map(f => ({ nama: String(f.nama || '').trim(), jenis: f.jenis, lebar: f.lebar, pilihan: f.jenis === 'pilihan' ? (f.pilihan || []) : undefined })).filter(f => f.nama);
+  const kosong = fieldSpecs.find(f => f.jenis === 'pilihan' && !(f.pilihan || []).length);
+  if (kosong) { showToast('Peringatan', 'Isi pilihan untuk field "' + kosong.nama + '".', 'warning'); return; }
   const obj = {
     ID: document.getElementById('katFormId').value || undefined,
     Kategori: document.getElementById('katFormKategori').value,
@@ -2543,7 +2662,8 @@ function submitKatalogForm() {
     Deskripsi: document.getElementById('katFormDeskripsi').value.trim(),
     ModelHasil: document.getElementById('katFormModel').value,
     PersyaratanJSON: JSON.stringify(persyaratanLines),
-    FieldJSON: JSON.stringify(fieldLines),
+    FieldJSON: JSON.stringify(fieldSpecs),
+    Juknis: document.getElementById('katFormJuknis').value.replace(CR_RE, ''),
     TahapanJSON: JSON.stringify(['Pemeriksaan Berkas', 'Verifikasi Data', 'Penjadwalan', 'Penerbitan Hasil']),
     Aktif: document.getElementById('katFormAktif').value
   };
@@ -2589,7 +2709,7 @@ function openKnowledgeForm(doc) {
   const tingkatKategori = !doc.KatalogID;
   if (!tingkatKategori && !layanan) { showToast('Peringatan', 'Layanan tidak ditemukan.', 'warning'); return; }
   const kategori = tingkatKategori ? doc.Kategori : layanan.Kategori;
-  const tipeOps = tingkatKategori ? [['SOP', 'SOP'], ['Regulasi', 'Regulasi']] : [['Juknis', 'Petunjuk Teknis'], ['Template', 'Template Surat']];
+  const tipeOps = tingkatKategori ? [['SOP', 'SOP'], ['Regulasi', 'Regulasi']] : (doc.ID && doc.Tipe !== 'Template' ? [['Juknis', 'Petunjuk Teknis (dokumen lama)']] : [['Template', 'Template Surat']]);
   const tipeNow = doc.Tipe === 'WI' || doc.Tipe === 'Tutorial' ? 'Juknis' : doc.Tipe;
   openFormModal(isEdit ? 'Edit Dokumen' : 'Tambah Dokumen', `
     <input type="hidden" id="kdFormId" value="${doc.ID || ''}">
@@ -2608,7 +2728,7 @@ function openKnowledgeForm(doc) {
     <hr class="my-3">
     <label class="form-label">Berkas PDF ${isEdit ? '(opsional, ganti berkas)' : '— bisa pilih beberapa sekaligus'} <span class="text-secondary fw-normal">maks 10MB per file</span></label>
     <input type="file" class="form-control mb-1" id="kdFormFile" accept="application/pdf,.pdf,.doc,.docx,.xls,.xlsx" ${isEdit ? '' : 'multiple'}>
-    <div class="small text-secondary mb-3">Diunggah ke folder <em>Knowledge &amp; Template/&lt;Kategori&gt;${tingkatKategori ? '' : '/&lt;Layanan&gt;'}</em> di Drive saat klik Simpan.</div>
+
     <label class="form-label">Atau link Google Drive <span class="text-secondary fw-normal">(Template: wajib link Google Docs berisi penanda {{Nama Field}})</span></label>
     <input type="text" class="form-control" id="kdFormLink" placeholder="Terisi otomatis bila memilih berkas" value="${escapeHtml(doc.LinkURL || '')}">
     <button class="btn btn-labuku-primary w-100 mt-4" id="kdSubmitBtn" onclick="submitKnowledgeForm()">Simpan</button>
@@ -2697,7 +2817,7 @@ function lihatDetailRiwayat(layananId) {
       const valid = (persyaratan || []).filter(x => x.Status === 'Valid').length;
       body.innerHTML = `
         <div class="d-flex justify-content-between align-items-start flex-wrap gap-2 mb-3">
-          <div><div class="fw-bold">${escapeHtml(layanan.PemohonNama)}</div>
+          <div><div class="fw-bold">${escapeHtml(namaKapital(layanan.PemohonNama))}</div>
             <div class="small text-secondary">${escapeHtml(layanan.ID)} · ${escapeHtml(layanan.JenisLayanan)}</div></div>
           <div class="text-end"><span class="badge-status ${statusBadgeClass(layanan.Status)}">${escapeHtml(layanan.Status)}</span>
             <div class="small mt-1"><span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div></div>
@@ -2777,7 +2897,7 @@ function renderManajemenShell() {
   manajemenActiveTab = 'users';
   container.innerHTML = `
     <h2 class="page-heading">Pengaturan</h2>
-    <p class="page-sub">Kelola daftar tim (pilihan "Masuk sebagai"), template pesan WhatsApp, identitas &amp; wilayah, serta keamanan. Katalog layanan dikelola di menu Katalog Layanan.</p>
+
     <div class="d-flex flex-wrap gap-2 mb-3" id="manajemenTabNav">
       ${[['users', 'Tim / ASN'], ['wa', 'Template WA'], ['pengaturan', 'Umum'], ['keamanan', 'Keamanan']].map(([k, label]) => `
         <button class="btn ${k === 'users' ? 'btn-labuku-primary' : 'btn-labuku-outline'} btn-sm-pill" data-mtab="${k}" onclick="switchManajemenTab('${k}')">${label}</button>
@@ -2806,12 +2926,12 @@ function loadManajemenKeamanan() {
   box.innerHTML = `
     <div class="lb-card" style="max-width:480px;">
       <h6 class="fw-bold mb-2">Ganti Password Tim</h6>
-      <p class="small text-secondary">Satu password dipakai seluruh tim. Setelah diganti, semua perangkat lain otomatis keluar dan harus masuk dengan password baru.</p>
+      <p class="small text-secondary">Setelah diganti, semua perangkat lain keluar.</p>
       <input type="password" class="form-control mb-2" id="pwLama" placeholder="Password lama">
       <input type="password" class="form-control mb-2" id="pwBaru" placeholder="Password baru (min. 6 karakter)">
       <input type="password" class="form-control mb-3" id="pwBaru2" placeholder="Ulangi password baru">
       <button class="btn btn-labuku-primary" id="pwBtn" onclick="submitGantiPassword()"><i class="bi bi-shield-lock"></i> Ganti Password</button>
-      <p class="small text-secondary mt-3 mb-0">Lupa password? Pemilik script menjalankan <code>resetPassword()</code> di Apps Script Editor, lalu aktivasi ulang dengan kode baru.</p>
+      <p class="small text-secondary mt-3 mb-0">Lupa password: jalankan <code>resetPassword()</code> di Apps Script.</p>
     </div>`;
 }
 
@@ -2862,7 +2982,7 @@ function renderManajemenUsers(res) {
   applyUserToUI();
   box.innerHTML = `
     <div class="d-flex justify-content-between align-items-center mb-3 flex-wrap gap-2">
-      <span class="small text-secondary">Peran: <b>Kepala KUA</b> (admin — mengelola Pengaturan &amp; Katalog), Penyuluh, Penghulu, Pelaksana.</span>
+      <span></span>
       <button class="btn btn-labuku-primary" onclick="openUserForm()"><i class="bi bi-plus-lg"></i> Tambah Anggota</button>
     </div>
     <div class="table-wrap">
@@ -2961,12 +3081,11 @@ function toggleUserStatusUI(userId) {
 
 /* ---------- Tab: Template WA ---------- */
 const WA_TPL_INFO = [
-  ['wa_antrean', 'WA 1 — Nomor antrean (Front Office)', 'Dikirim saat pemohon mendapat nomor antrean.', ['nama', 'nomor', 'layanan', 'instansi', 'tanggal', 'sisa', 'posisi']],
-  ['wa_pending', 'WA 2 — Pending (persyaratan kurang)', 'Dikirim dari pop-up verifikasi Front Office. {kekurangan} = daftar persyaratan yang belum dicentang + catatan.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'kekurangan']],
-  ['wa_tte', 'WA 2 — Selesai, model 1 (TTE)', 'Berisi tautan PDF ber-TTE yang diunggah di Back Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link']],
-  ['wa_pdf', 'WA 2 — Selesai, model 2 (PDF langsung)', 'Berisi tautan PDF hasil (tanpa TTE).', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link']],
-  ['wa_arsip', 'WA 2 — Selesai, model 3 (Arsip)', 'Pemberitahuan selesai tanpa PDF (PDF hanya diarsip, mis. konsultasi).', ['nama', 'layanan', 'id', 'instansi', 'tanggal']],
-  ['wa_langsung', 'WA 2 — Selesai, model 4 (Langsung di Front Office)', 'Mis. legalisir; dikirim dari pop-up verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal']]
+  ['wa_antrean', 'Nomor antrean', 'Dikirim saat pemohon mendapat nomor antrean.', ['nama', 'nomor', 'layanan', 'instansi', 'tanggal', 'sisa', 'posisi']],
+  ['wa_pending', 'Pending (persyaratan kurang)', '{kekurangan} = persyaratan yang belum dicentang + catatan.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'kekurangan']],
+  ['wa_tte', 'Selesai — TTE', 'Berisi tautan PDF ber-TTE.', ['nama', 'layanan', 'id', 'instansi', 'tanggal', 'link']],
+  ['wa_arsip', 'Selesai — Arsip (tanpa TTE)', 'Pemberitahuan selesai, tanpa PDF.', ['nama', 'layanan', 'id', 'instansi', 'tanggal']],
+  ['wa_langsung', 'Selesai — di Front Office', 'Dikirim dari verifikasi Front Office.', ['nama', 'layanan', 'id', 'instansi', 'tanggal']]
 ];
 const WA_CONTOH = {
   nama: 'Ahmad Hidayat', nomor: 'A-007', layanan: 'Legalisasi Buku Nikah', id: 'LYN-2026-00042', tanggal: 'Kamis, 08 Oktober 2026', sisa: 2,
@@ -2977,9 +3096,6 @@ function loadManajemenWa() {
   const box = document.getElementById('manajemenContentBox');
   const c = window.AppState.config || {};
   box.innerHTML = `
-    <div class="lb-card mb-3" style="max-width:820px;">
-      <p class="small text-secondary mb-0">Setiap kunjungan minimal mendapat 2 WA: <b>WA 1</b> nomor antrean, lalu <b>WA 2</b> hasil (Pending + kekurangan, atau Selesai sesuai model hasil layanan). Klik penanda untuk menyisipkannya. Gunakan *teks* untuk huruf tebal di WhatsApp.</p>
-    </div>
     ${WA_TPL_INFO.map(([key, judul, ket, ph]) => `
       <div class="lb-card mb-3 wa-tpl" style="max-width:820px;">
         <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
@@ -3050,13 +3166,13 @@ function loadManajemenPengaturan() {
       <h6 class="fw-bold mb-3">Identitas Aplikasi</h6>
       <div class="mb-3"><label class="form-label">Nama Aplikasi</label>
         <div class="form-control bg-transparent" style="opacity:.85;">LABUKU Desk — Layanan dan Pembukuan KUA</div>
-        <div class="small text-secondary mt-1">Nama aplikasi tetap dan tidak dapat diubah.</div></div>
+</div>
       <div class="mb-3"><label class="form-label">Nama Instansi <span class="text-secondary fw-normal">(tampil di sidebar, form publik, dan pesan WA)</span></label><input type="text" class="form-control" id="setInstansi" value="${escapeHtml(c.instansi || '')}"></div>
       <div class="mb-3"><label class="form-label">Kecamatan utama form antrean</label>
         ${home ? `<select class="form-select" id="setWilayahUtama">${home.kec.map(k => `<option value="${k[0]}" ${k[0] === utama ? 'selected' : ''}>Kec. ${escapeHtml(k[1])}</option>`).join('')}</select>
         <div class="small text-secondary mt-1">${escapeHtml(home.kab[1])}, ${escapeHtml(home.prov[1])}. Pengunjung dari kecamatan ini cukup memilih desa.</div>`
         : '<div class="small text-danger">Data wilayah belum dimuat. Klik Refresh.</div>'}</div>
-      <div class="small text-secondary mb-3"><i class="bi bi-link-45deg"></i> Link eksternal (SIMKAH, SRIKANDI, dll.) kini ditambah &amp; diedit langsung di Service Workspace → tab Link Eksternal.</div>
+
       <button class="btn btn-labuku-primary" onclick="submitPengaturan()"><i class="bi bi-save"></i> Simpan Pengaturan</button>
     </div>
     <div class="lb-card mt-3" style="max-width:560px;">
