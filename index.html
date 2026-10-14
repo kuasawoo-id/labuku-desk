@@ -164,12 +164,14 @@
 
     <!-- v6.1: navigasi bawah (HP/tablet) -->
     <nav class="bottom-nav" id="bottomNav" aria-label="Navigasi utama">
-      <button type="button" data-nav="dashboard" onclick="navigateTo('dashboard')"><i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span></button>
       <button type="button" data-nav="frontoffice" onclick="navigateTo('frontoffice')"><i class="bi bi-ticket-perforated"></i><span>Front Office</span></button>
       <button type="button" data-nav="backoffice" onclick="navigateTo('backoffice')"><i class="bi bi-briefcase-fill"></i><span>Back Office</span></button>
+      <button type="button" data-nav="dashboard" onclick="navigateTo('dashboard')"><i class="bi bi-grid-1x2-fill"></i><span>Dashboard</span></button>
       <button type="button" data-nav="knowledge" onclick="navigateTo('knowledge')"><i class="bi bi-journal-richtext"></i><span>Katalog</span></button>
       <button type="button" data-nav="lainnya" onclick="bukaLainnya()"><i class="bi bi-three-dots"></i><span>Lainnya</span></button>
     </nav>
+    <!-- v6.5: tombol Tambah Antrean melayang (HP, khusus Front Office) -->
+    <button type="button" class="fab-tambah" id="fabTambah" onclick="openTambahAntrean()" aria-label="Tambah Antrean" title="Tambah Antrean"><i class="bi bi-plus-lg"></i></button>
     <div class="more-overlay" id="moreOverlay" onclick="tutupLainnya()"></div>
     <div class="more-sheet" id="moreSheet" role="dialog" aria-label="Menu lainnya">
       <div class="more-handle"></div>

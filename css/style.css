@@ -716,3 +716,73 @@ table.lb-table tbody td { padding: .9rem 1.1rem; }
 .btn-edit-template { border: 2px solid var(--primary); color: var(--primary); background: var(--bg-card); }
 .btn-edit-template:hover { background: var(--primary); color: #fff; border-color: var(--primary); }
 [data-theme="dark"] .btn-edit-template { color: #95d5b2; border-color: #52b788; }
+
+/* ══ v6.5: HP lebih hemat ruang — kartu ringkas 3 baris, topbar ramping, tombol + melayang, aktivitas jadi daftar ══ */
+.fab-tambah { display: none; }
+@media (max-width: 767.98px) {
+  /* Topbar & kepala halaman ramping */
+  .main-content { padding: .5rem .75rem calc(76px + env(safe-area-inset-bottom)); }
+  .topbar { gap: .4rem; padding: .15rem 0 .5rem; margin-bottom: .6rem; }
+  .topbar-breadcrumb { font-size: .98rem; }
+  .btn-icon { width: 2.25rem; height: 2.25rem; font-size: 1.1rem; border-radius: 10px; }
+  .topbar-user { min-height: 2.25rem; padding: .15rem .65rem; }
+  .topbar-search { padding: .4rem .75rem; }
+  .page-sub { font-size: .82rem; margin-bottom: .5rem !important; }
+  .head-aksi { gap: .4rem !important; }
+  .head-aksi .btn { padding: .4rem .6rem; }
+  .btn-tambah-utama { display: none !important; }
+  .bo-head-aksi { flex-wrap: nowrap !important; width: 100%; gap: .4rem !important; }
+  .bo-head-aksi .btn { flex: 1 1 auto; padding: .4rem .6rem; }
+  .bo-head-aksi #boCount { white-space: nowrap; }
+  #section-frontoffice > .d-flex.mb-3, #section-backoffice > .d-flex.mb-3 { margin-bottom: .5rem !important; }
+  .fo-stats { margin-bottom: .6rem; gap: .35rem; }
+  .fo-stat { padding: .25rem .65rem; font-size: .8rem; }
+  .fo-stat b { font-size: .9rem; }
+  .lb-card { padding: .9rem 1rem; }
+
+  /* Kartu ringkas: baris 1 nomor/ID + status · baris 2 nama · baris 3 layanan · aksi satu baris */
+  table.lb-table.kartu-ringkas tbody tr {
+    display: grid; grid-template-columns: minmax(0, 1fr) auto; column-gap: .5rem; row-gap: .1rem;
+    padding: .6rem .75rem; margin-bottom: .45rem; border-radius: 12px;
+  }
+  table.lb-table.kartu-ringkas tbody td {
+    grid-column: 1 / -1; padding: 0 !important; text-align: left !important; font-size: .9rem; line-height: 1.35; min-width: 0;
+  }
+  table.lb-table.kartu-ringkas tbody td::before { display: none !important; }
+  table.lb-table.kartu-ringkas tbody td.kr-id { grid-column: 1; grid-row: 1; font-size: .98rem; padding: 0 !important; }
+  table.lb-table.kartu-ringkas tbody td.kr-status { grid-column: 2; grid-row: 1; justify-self: end; align-self: center; }
+  table.lb-table.kartu-ringkas tbody td.kr-status .badge-status { font-size: .72rem; padding: .18rem .55rem; }
+  table.lb-table.kartu-ringkas tbody td.kr-nama { font-weight: 600; display: flex; flex-wrap: wrap; align-items: center; column-gap: .45rem; }
+  table.lb-table.kartu-ringkas tbody td.kr-nama > div { display: inline-flex; align-items: center; gap: .3rem; }
+  table.lb-table.kartu-ringkas tbody td.kr-nama .small { font-weight: 400; }
+  table.lb-table.kartu-ringkas tbody td.kr-nama .badge-online { font-size: .66rem; padding: .08rem .4rem; order: 2; }
+  table.lb-table.kartu-ringkas tbody td.kr-layanan { color: var(--text-neutral); font-size: .86rem; }
+  table.lb-table.kartu-ringkas tbody td.kr-layanan .badge-model { font-size: .64rem; padding: .08rem .4rem; }
+  table.lb-table.kartu-ringkas tbody td.kr-meta, table.lb-table.kartu-ringkas tbody td.kr-meta2 { font-size: .76rem; color: var(--text-secondary); }
+  table.lb-table.kartu-ringkas tbody td.kr-meta { grid-column: 1; }
+  table.lb-table.kartu-ringkas tbody td.kr-meta2 { grid-column: 2; justify-self: end; text-align: right !important; }
+  table.lb-table.kartu-ringkas tbody td.kr-meta .small, table.lb-table.kartu-ringkas tbody td.kr-meta2 .small { font-size: inherit; }
+  table.lb-table.kartu-ringkas tbody td.td-aksi {
+    display: flex; flex-wrap: nowrap; gap: .35rem; margin-top: .4rem; padding-top: .45rem !important; border-top: 1px solid var(--outline) !important;
+  }
+  table.lb-table.kartu-ringkas tbody td.td-aksi .btn { min-height: 36px; padding: .3rem .7rem; font-size: .84rem; margin: 0 !important; white-space: nowrap; }
+  table.lb-table.kartu-ringkas tbody td.td-aksi .btn-ikon-aksi { width: 36px; height: 36px; min-width: 36px; padding: 0; }
+  table.lb-table.kartu-ringkas tbody td.td-aksi .btn-sm-pill:not(.btn-ikon-aksi) { flex: 1 1 auto; }
+
+  /* Aktivitas Hari Ini: daftar baris tipis (bukan kartu) */
+  table.lb-table.daftar-tipis tbody tr { background: transparent; border: 0; border-bottom: 1px solid var(--outline); border-radius: 0; box-shadow: none; margin: 0; padding: .5rem 0; }
+  table.lb-table.daftar-tipis tbody tr:last-child { border-bottom: 0; }
+  table.lb-table.daftar-tipis tbody td.kr-id { font-size: .8rem; color: var(--text-secondary); font-weight: 600; }
+  table.lb-table.daftar-tipis tbody td.kr-layanan { font-size: .82rem; }
+
+  /* Tombol Tambah Antrean melayang (khusus Front Office) */
+  body[data-sec="frontoffice"] .fab-tambah {
+    display: inline-flex; position: fixed; right: 1rem; bottom: calc(76px + env(safe-area-inset-bottom)); z-index: 1035;
+    width: 3.5rem; height: 3.5rem; border-radius: 50%; border: 0; align-items: center; justify-content: center;
+    background: var(--primary); color: #fff; font-size: 1.6rem; box-shadow: 0 8px 22px rgba(27,67,50,.35);
+  }
+  body[data-sec="frontoffice"] .fab-tambah:active { transform: scale(.96); }
+  body[data-sec="frontoffice"] #foTableBox { padding-bottom: 4.25rem; }
+  [data-theme="dark"] body[data-sec="frontoffice"] .fab-tambah { background: #2d6a4f; }
+}
+@media (max-width: 991.98px) { [data-theme="dark"] .bottom-nav button.active { color: #95d5b2; } [data-theme="dark"] .bottom-nav button.active i { color: #1B4332; } }

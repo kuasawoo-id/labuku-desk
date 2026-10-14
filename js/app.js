@@ -497,6 +497,7 @@ function navigateTo(sectionId, params) {
   document.getElementById('globalSearchInput').value = sectionId === 'frontoffice' ? foSearch : sectionId === 'backoffice' ? boSearch : '';
 
   window.AppState.currentSection = sectionId;
+  document.body.setAttribute('data-sec', sectionId); // v6.5: tombol + melayang hanya di Front Office (HP)
   closeSidebar();
   tandaiNavBawah_(sectionId);
   tutupLainnya();
@@ -989,15 +990,15 @@ function renderDashboard(res) {
       <h6 class="fw-bold mb-3">Aktivitas Hari Ini</h6>
       ${d.aktivitasHariIni.length === 0 ? emptyState('bi-inbox', 'Belum ada aktivitas hari ini.') : `
       <div class="table-responsive">
-        <table class="lb-table">
+        <table class="lb-table kartu-ringkas daftar-tipis">
           <thead><tr><th>ID Layanan</th><th>Nama Pemohon</th><th>Jenis Layanan</th><th>Status</th></tr></thead>
           <tbody>
             ${d.aktivitasHariIni.map(a => `
               <tr style="cursor:pointer" onclick="openWorkspace('${a.id}')">
-                <td class="fw-semibold">${escapeHtml(a.id)}</td>
-                <td>${escapeHtml(namaKapital(a.nama))}</td>
-                <td>${escapeHtml(a.jenis)}</td>
-                <td><span class="badge-status ${statusBadgeClass(a.status)}">${a.status === 'Diproses' ? 'Proses' : escapeHtml(a.status)}</span></td>
+                <td class="fw-semibold kr-id">${escapeHtml(a.id)}</td>
+                <td class="kr-nama">${escapeHtml(namaKapital(a.nama))}</td>
+                <td class="kr-layanan">${escapeHtml(a.jenis)}</td>
+                <td class="kr-status"><span class="badge-status ${statusBadgeClass(a.status)}">${a.status === 'Diproses' ? 'Proses' : escapeHtml(a.status)}</span></td>
               </tr>`).join('')}
           </tbody>
         </table>
@@ -1081,7 +1082,7 @@ function renderFrontOffice() {
         <div class="d-flex gap-2 flex-wrap head-aksi">
           <button class="btn btn-labuku-outline btn-filter-hp" onclick="toggleFilterHp('foFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
           <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> <span class="label-lebar">Link &amp; QR Form Publik</span><span class="label-hp">QR</span></button>
-          <button class="btn btn-labuku-primary" onclick="openTambahAntrean()"><i class="bi bi-plus-lg"></i> Tambah Antrean</button>
+          <button class="btn btn-labuku-primary btn-tambah-utama" onclick="openTambahAntrean()"><i class="bi bi-plus-lg"></i> Tambah Antrean</button>
         </div>
       </div>
       <div class="lb-card filter-bar filter-hp mb-3" id="foFilterBar"></div>
@@ -1197,7 +1198,7 @@ function renderFoTable() {
     return;
   }
   box.innerHTML = `
-    <table class="lb-table">
+    <table class="lb-table kartu-ringkas">
       <thead><tr>${thUrut('fo', 'no', 'No.')}${showTgl ? thUrut('fo', 'tgl', 'Tanggal') : ''}${thUrut('fo', 'pemohon', 'Pemohon')}${thUrut('fo', 'layanan', 'Layanan')}${thUrut('fo', 'status', 'Status')}<th style="text-align:right;">Aksi</th></tr></thead>
       <tbody>
         ${list.map(r => {
@@ -1215,12 +1216,12 @@ function renderFoTable() {
           }
           return `
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
-            <td class="fw-bold fs-6" style="white-space:nowrap;">${escapeHtml(r.Nomor)}</td>
-            ${showTgl ? `<td style="white-space:nowrap;">${fmtDate(r.Waktu)}</td>` : ''}
-            <td><div class="fw-semibold">${escapeHtml(namaKapital(r.PemohonNama))}</div>
+            <td class="fw-bold fs-6 kr-id" style="white-space:nowrap;">${escapeHtml(r.Nomor)}</td>
+            ${showTgl ? `<td class="kr-meta" style="white-space:nowrap;">${fmtDate(r.Waktu)}</td>` : ''}
+            <td class="kr-nama"><div class="fw-semibold">${escapeHtml(namaKapital(r.PemohonNama))}</div>
               <div class="small text-secondary">${r.Sumber === 'Online' ? '<span class="badge-status badge-online me-1">Online</span>' : ''}${escapeHtml(r.NoHP || '')}</div></td>
-            <td>${escapeHtml(r.LayananNama)}<div class="small text-secondary">${escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
-            <td><span class="badge-status ${st.cls}">${st.label}</span></td>
+            <td class="kr-layanan">${escapeHtml(r.LayananNama)}<div class="small text-secondary">${escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
+            <td class="kr-status"><span class="badge-status ${st.cls}">${st.label}</span></td>
             <td class="fo-actions" style="text-align:right;">${aksi}</td>
           </tr>`;
         }).join('')}
@@ -1810,10 +1811,10 @@ function renderBackOffice() {
           <h2 class="page-heading">Back Office</h2>
 
         </div>
-        <div class="d-flex gap-2 align-items-center flex-wrap">
+        <div class="d-flex gap-2 align-items-center flex-wrap bo-head-aksi">
           <span class="badge-status badge-proses" id="boCount"></span>
           <button class="btn btn-labuku-outline btn-sm-pill btn-filter-hp" onclick="toggleFilterHp('boFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
-          <button class="btn btn-labuku-outline btn-sm-pill" id="boExportBtn" onclick="exportBoCsv()"><i class="bi bi-download"></i> Export CSV</button>
+          <button class="btn btn-labuku-outline btn-sm-pill" id="boExportBtn" onclick="exportBoCsv()"><i class="bi bi-download"></i> <span class="label-lebar">Export CSV</span><span class="label-hp">CSV</span></button>
         </div>
       </div>
       <div class="lb-card filter-bar filter-hp mb-3" id="boFilterBar"></div>
@@ -1897,7 +1898,7 @@ function renderBoTable() {
   if (cnt) cnt.innerHTML = '<i class="bi bi-briefcase"></i> ' + all.filter(l => boTahap(l) !== 'Selesai').length + ' belum selesai';
   if (list.length === 0) { box.innerHTML = emptyState('bi-briefcase', all.length ? 'Tidak ada layanan yang cocok dengan filter.' : 'Belum ada layanan yang diproses atau selesai pada periode ini.'); return; }
   box.innerHTML = `
-    <table class="lb-table">
+    <table class="lb-table kartu-ringkas">
       <thead><tr>${thUrut('bo', 'id', 'ID Layanan')}${thUrut('bo', 'pemohon', 'Pemohon')}${thUrut('bo', 'jenis', 'Jenis Layanan')}${thUrut('bo', 'masuk', 'Masuk')}${thUrut('bo', 'tahap', 'Tahap')}${thUrut('bo', 'asn', 'Dikerjakan oleh')}<th style="text-align:right;">Aksi</th></tr></thead>
       <tbody>
         ${list.map(l => {
@@ -1906,12 +1907,12 @@ function renderBoTable() {
           const label = t.label === 'Siap Kirim' && (model === 'Arsip' || model === 'Langsung') ? 'Siap Selesai' : t.label;
           return `
           <tr>
-            <td class="fw-semibold" style="white-space:nowrap;">${escapeHtml(l.ID)}</td>
-            <td>${escapeHtml(namaKapital(l.PemohonNama))}</td>
-            <td>${escapeHtml(l.JenisLayanan)}<div class="small text-secondary">${escapeHtml(kategoriOf(l).replace(/^Layanan /, ''))} <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div>${l.Keterangan ? `<div class="small ket-baris" title="${escapeHtml(l.Keterangan)}"><i class="bi bi-chat-left-text"></i> ${escapeHtml(l.Keterangan)}</div>` : ''}</td>
-            <td style="white-space:nowrap;">${fmtDate(l.TanggalMulai)}${t.label === 'Selesai' && l.TanggalSelesai ? `<div class="small text-secondary">Selesai ${fmtDate(l.TanggalSelesai)}</div>` : ''}</td>
-            <td><span class="badge-status ${t.cls}">${label}</span></td>
-            <td>${l.ASNNama ? escapeHtml(l.ASNNama) : '<span class="text-secondary small">Belum diambil</span>'}</td>
+            <td class="fw-semibold kr-id" style="white-space:nowrap;">${escapeHtml(l.ID)}</td>
+            <td class="kr-nama">${escapeHtml(namaKapital(l.PemohonNama))}</td>
+            <td class="kr-layanan">${escapeHtml(l.JenisLayanan)}<div class="small text-secondary">${escapeHtml(kategoriOf(l).replace(/^Layanan /, ''))} <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span></div>${l.Keterangan ? `<div class="small ket-baris" title="${escapeHtml(l.Keterangan)}"><i class="bi bi-chat-left-text"></i> ${escapeHtml(l.Keterangan)}</div>` : ''}</td>
+            <td class="kr-meta" style="white-space:nowrap;">${fmtDate(l.TanggalMulai)}${t.label === 'Selesai' && l.TanggalSelesai ? `<div class="small text-secondary">Selesai ${fmtDate(l.TanggalSelesai)}</div>` : ''}</td>
+            <td class="kr-status"><span class="badge-status ${t.cls}">${label}</span></td>
+            <td class="kr-meta2">${l.ASNNama ? escapeHtml(l.ASNNama) : '<span class="text-secondary small">Belum diambil</span>'}</td>
             <td style="text-align:right;white-space:nowrap;">
               <button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${l.ID}')"><i class="bi bi-card-list"></i> Detail</button>
               <button class="btn ${t.label === 'Selesai' ? 'btn-labuku-outline' : 'btn-labuku-primary'} btn-sm-pill" onclick="openWorkspace('${l.ID}')">${t.label === 'Selesai' ? 'Buka' : 'Kerjakan'}</button></td>
