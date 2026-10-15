@@ -1082,6 +1082,8 @@ function renderFrontOffice() {
         <div class="d-flex gap-2 flex-wrap head-aksi">
           <button class="btn btn-labuku-outline btn-filter-hp" onclick="toggleFilterHp('foFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
           <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> <span class="label-lebar">Link &amp; QR Form Publik</span><span class="label-hp">QR</span></button>
+          <button class="btn btn-labuku-outline" id="foWaMassalBtn" onclick="bukaWaMassal()" title="Kirim WA nomor antrean ke semua yang belum"><i class="bi bi-whatsapp"></i> <span class="label-lebar">WA Belum Terkirim</span><span class="label-hp">WA</span> <span class="badge rounded-pill text-bg-success" id="foWaMassalN">0</span></button>
+          <button class="btn btn-labuku-outline" onclick="bukaPengaturanPerangkat()" title="Suara panggilan & WhatsApp Desktop (perangkat ini)" aria-label="Pengaturan perangkat"><i class="bi bi-sliders"></i></button>
           <button class="btn btn-labuku-primary btn-tambah-utama" onclick="openTambahAntrean()"><i class="bi bi-plus-lg"></i> Tambah Antrean</button>
         </div>
       </div>
@@ -1192,6 +1194,8 @@ function renderFoTable() {
   };
   const list = urutkanList(foFilteredList(), AMBIL[u.key] || AMBIL.no, u.dir);
   renderFoStats(list);
+  const nWa = document.getElementById('foWaMassalN'); // v6.6
+  if (nWa) nWa.textContent = waBelumTerkirim_().length;
   const showTgl = foFilter.periode !== 'today';
   if (list.length === 0) {
     box.innerHTML = emptyState('bi-ticket-perforated', (window.AppState.fo || []).length ? 'Tidak ada antrean yang cocok dengan filter.' : 'Belum ada antrean pada periode ini. Klik "Tambah Antrean" atau bagikan QR form publik.');
@@ -1209,7 +1213,7 @@ function renderFoTable() {
           else {
             if (r.Status === 'Menunggu' || r.Status === 'Terlewat') aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="panggilFo('${r.ID}')">Panggil</button>`;
             if (waiting) aksi += `<button class="btn btn-labuku-accent btn-sm-pill" onclick="openVerifikasiPanel('${r.LayananID}')"><i class="bi bi-clipboard-check"></i> Verifikasi</button>`;
-            if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Kirim nomor antrean via WhatsApp" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i></button>`;
+            if (waiting) aksi += `<button class="btn btn-ikon-aksi${r.WaAntrean ? ' wa-sudah' : ''}" title="${r.WaAntrean ? 'WA nomor antrean sudah dikirim — kirim ulang' : 'Kirim nomor antrean via WhatsApp'}" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i>${r.WaAntrean ? '<i class="bi bi-check-circle-fill wa-cek"></i>' : ''}</button>`;
             if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
             // v6.4: sudah diverifikasi (Proses/Pending/Selesai) → menu Detail
             if (!waiting && r.Status !== 'Terlewat' && r.LayananID) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${r.LayananID}')"><i class="bi bi-eye"></i> Detail</button>`;
@@ -1262,6 +1266,7 @@ function foOptimistic(id, patch, serverFn, args, okMsg) {
 
 function panggilFo(id) {
   const r = window.AppState.fo.find(x => x.ID === id);
+  umumkanPanggilan_(r); // v6.6: bel + suara dari speaker komputer
   foOptimistic(id, { Status: 'Di Loket' }, 'panggilAntrean', [id], r ? 'Nomor ' + r.Nomor + ' dipanggil ke loket.' : null);
 }
 
@@ -1275,10 +1280,14 @@ function normWa(hp) {
   return d.indexOf('62') === 0 ? d : '62' + d;
 }
 
+function bukaUrlWa_(url) { window.location.href = url; }
 function openWa(hp, pesan) {
   const nomor = normWa(hp);
   if (!nomor) { showToast('Peringatan', 'Nomor WhatsApp pemohon belum ada.', 'warning'); return false; }
-  window.open(WA_BASE + nomor + '?text=' + encodeURIComponent(pesan), '_blank', 'noopener');
+  // v6.6: WhatsApp Desktop (pilihan per perangkat) atau satu tab WA yang dipakai ulang (WA Web hanya aktif di satu tab)
+  if (waDesktopAktif_()) { bukaUrlWa_('whatsapp:' + String.fromCharCode(47, 47) + 'send?phone=' + nomor + '&text=' + encodeURIComponent(pesan)); return true; }
+  const w = window.open(WA_BASE + nomor + '?text=' + encodeURIComponent(pesan), 'labuku_wa');
+  try { if (w) w.opener = null; } catch (e) {}
   return true;
 }
 
@@ -1335,15 +1344,167 @@ function waktuMs(v) { const t = new Date(v).getTime(); return isNaN(t) ? 0 : t; 
 function teksUrut(v) { return String(v == null ? '' : v).toLowerCase(); }
 function namaKapital(v) { return String(v == null ? '' : v).replace(/\s+/g, ' ').trim().toUpperCase(); }
 
+/* v6.6: satu orang bisa punya beberapa nomor (beberapa layanan) → satu pesan WA berisi semua nomornya. */
+function saudaraAntrean_(r) {
+  const hp = normWa(r.NoHP), hari = ymd(r.Waktu || new Date());
+  if (!hp) return [];
+  return (window.AppState.fo || []).filter(x => !x._temp && x.ID !== r.ID && normWa(x.NoHP) === hp && namaKapital(x.PemohonNama) === namaKapital(r.PemohonNama) &&
+    ymd(x.Waktu || new Date()) === hari && (x.Status === 'Menunggu' || x.Status === 'Di Loket'));
+}
+
 function waAntrean(id) {
   const r = (window.AppState.fo || []).find(x => x.ID === id);
-  if (!r) return;
+  if (!r) return false;
+  const grup = [r].concat(saudaraAntrean_(r));
   const sisa = sisaSebelum(id);
   const pesan = isiTpl(waTpl('wa_antrean'), {
-    nama: r.PemohonNama, nomor: r.Nomor, layanan: r.LayananNama, id: r.LayananID, instansi: instansiNama(), tanggal: tglPanjang(r.Waktu), sisa: sisa,
+    nama: r.PemohonNama, nomor: grup.map(x => x.Nomor).join(', '), layanan: grup.map(x => x.LayananNama).join(', '), id: grup.map(x => x.LayananID).join(', '),
+    instansi: instansiNama(), tanggal: tglPanjang(r.Waktu), sisa: sisa,
     posisi: sisa > 0 ? 'Saat ini ada ' + sisa + ' antrean sebelum Anda.' : 'Anda adalah antrean berikutnya.'
   });
-  openWa(r.NoHP, pesan);
+  if (!openWa(r.NoHP, pesan)) return false;
+  tandaiWaTerkirim_(grup.map(x => x.ID));
+  return true;
+}
+
+/* v6.6: penanda "WA nomor antrean sudah dikirim" — tampil seketika, disimpan ke server di latar belakang. */
+function tandaiWaTerkirim_(ids) {
+  const baru = (window.AppState.fo || []).filter(x => ids.indexOf(x.ID) >= 0 && !x.WaAntrean);
+  if (!baru.length) return;
+  baru.forEach(x => { x.WaAntrean = true; });
+  renderFoTable(); saveFoToCache();
+  gsr(function () {}, function () {}).tandaiWaAntrean(baru.map(x => x.ID));
+}
+
+/* v6.6: daftar yang BELUM dikirimi WA nomor antrean (satu orang = satu pesan). */
+function waBelumTerkirim_() {
+  const sudah = {};
+  return (window.AppState.fo || []).filter(r => {
+    if (r._temp || r.WaAntrean || r.Status !== 'Menunggu' || !normWa(r.NoHP)) return false;
+    const kunci = normWa(r.NoHP) + '|' + namaKapital(r.PemohonNama) + '|' + ymd(r.Waktu || new Date());
+    if (sudah[kunci]) return false;
+    sudah[kunci] = true;
+    return true;
+  });
+}
+
+let waMassal = null;
+function bukaWaMassal() {
+  const list = waBelumTerkirim_();
+  if (!list.length) { showToast('WA', 'Semua antrean menunggu sudah dikirimi WA nomor antrean.', 'info'); return; }
+  waMassal = { ids: list.map(r => r.ID), dikirim: {}, dilewati: {} };
+  renderWaMassal_();
+}
+function waMassalBerikut_() {
+  return waMassal ? waMassal.ids.find(id => !waMassal.dikirim[id] && !waMassal.dilewati[id]) : null;
+}
+function renderWaMassal_() {
+  if (!waMassal) return;
+  const fo = window.AppState.fo || [];
+  const next = waMassalBerikut_();
+  const r = next ? fo.find(x => x.ID === next) : null;
+  const n = Object.keys(waMassal.dikirim).length;
+  const html = `
+    <p class="small text-secondary mb-2">Tiap klik membuka WhatsApp untuk satu orang dengan pesan siap kirim. Tekan <b>Kirim</b> di WhatsApp, lalu kembali ke sini untuk orang berikutnya.</p>
+    <div class="wa-massal-list mb-3">${waMassal.ids.map(id => {
+      const x = fo.find(y => y.ID === id) || {};
+      const st = waMassal.dikirim[id] ? '<span class="badge-status badge-selesai">Terkirim</span>' : waMassal.dilewati[id] ? '<span class="badge-status badge-netral">Dilewati</span>' : (id === next ? '<span class="badge-status badge-diloket">Berikutnya</span>' : '');
+      return `<div class="wa-massal-item${id === next ? ' aktif' : ''}"><b>${escapeHtml([x].concat(saudaraAntrean_(x)).map(z => z.Nomor).join(', '))}</b> <span>${escapeHtml(namaKapital(x.PemohonNama || ''))}</span> ${st}</div>`;
+    }).join('')}</div>
+    ${r ? `<button class="btn btn-labuku-accent w-100 py-2" id="waMassalKirim" onclick="kirimWaMassal()"><i class="bi bi-whatsapp"></i> Kirim ke ${escapeHtml(r.Nomor)} · ${escapeHtml(namaKapital(r.PemohonNama))}</button>
+      <button class="btn btn-link w-100 mt-1" onclick="lewatiWaMassal()">Lewati</button>`
+      : `<div class="text-center fw-semibold py-2"><i class="bi bi-check2-circle text-success"></i> Selesai — ${n} pesan dibuka.</div>`}`;
+  const title = 'Kirim WA Nomor Antrean (' + n + '/' + waMassal.ids.length + ')';
+  if (document.getElementById('waMassalBox') && document.getElementById('formModal').classList.contains('show')) {
+    document.getElementById('formModalTitle').textContent = title;
+    document.getElementById('waMassalBox').innerHTML = html;
+  } else openFormModal(title, `<div id="waMassalBox">${html}</div>`);
+}
+function kirimWaMassal() {
+  const id = waMassalBerikut_();
+  if (!id) return;
+  if (waAntrean(id)) waMassal.dikirim[id] = true; else waMassal.dilewati[id] = true;
+  renderWaMassal_();
+}
+function lewatiWaMassal() {
+  const id = waMassalBerikut_();
+  if (id) waMassal.dilewati[id] = true;
+  renderWaMassal_();
+}
+
+/* ══ v6.6: panggilan suara (bel + text-to-speech) & pengaturan perangkat ini ══ */
+const ANGKA_UCAP = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
+function suaraAktif_() { return lsGet('labuku_suara') !== '0'; }
+function kalimatPanggilan_(r) {
+  const nomor = String(r.Nomor || '').split('').map(c => /\d/.test(c) ? ANGKA_UCAP[Number(c)] : (/[A-Za-z]/.test(c) ? c.toUpperCase() : '')).filter(Boolean).join(' ');
+  const nama = String(r.PemohonNama || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
+  return 'Nomor antrean, ' + nomor + ', atas nama ' + nama + ', silakan menuju loket.';
+}
+let _audioCtx = null;
+function bunyiBel_(lalu) {
+  try {
+    const AC = window.AudioContext || window.webkitAudioContext;
+    if (!AC) { lalu(); return; }
+    _audioCtx = _audioCtx || new AC();
+    if (_audioCtx.state === 'suspended') _audioCtx.resume();
+    const t0 = _audioCtx.currentTime + 0.02;
+    [[659.25, 0], [523.25, 0.45]].forEach(([f, d]) => {
+      const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
+      o.type = 'sine'; o.frequency.value = f;
+      g.gain.setValueAtTime(0.0001, t0 + d);
+      g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.6);
+      o.connect(g); g.connect(_audioCtx.destination);
+      o.start(t0 + d); o.stop(t0 + d + 0.65);
+    });
+    setTimeout(lalu, 1150);
+  } catch (e) { lalu(); }
+}
+function suaraIndonesia_() {
+  if (!window.speechSynthesis) return null;
+  const v = window.speechSynthesis.getVoices().filter(x => /^id([-_]|$)/i.test(x.lang));
+  return v.find(x => /google/i.test(x.name)) || v.find(x => /natural|online/i.test(x.name)) || v[0] || null;
+}
+function ucapkan_(teks) {
+  if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
+  try {
+    window.speechSynthesis.cancel();
+    const u = new SpeechSynthesisUtterance(teks);
+    u.lang = 'id-ID'; u.rate = 0.9; u.pitch = 1; u.volume = 1;
+    const v = suaraIndonesia_(); if (v) u.voice = v;
+    window.speechSynthesis.speak(u);
+    return true;
+  } catch (e) { return false; }
+}
+function umumkanPanggilan_(r) {
+  if (!r || !suaraAktif_()) return;
+  const teks = kalimatPanggilan_(r);
+  window._panggilanTerakhir = teks;
+  bunyiBel_(() => ucapkan_(teks));
+}
+document.addEventListener('DOMContentLoaded', () => { try { if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); } } catch (e) {} });
+
+function waDesktopAktif_() { return lsGet('labuku_wa_desktop') === '1' && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent); }
+function bukaPengaturanPerangkat() {
+  tutupLainnya();
+  const v = suaraIndonesia_();
+  openFormModal('Pengaturan Perangkat Ini', `
+    <p class="small text-secondary">Berlaku hanya di perangkat/browser ini.</p>
+    <div class="lb-card mb-3">
+      <div class="form-check form-switch mb-1">
+        <input class="form-check-input" type="checkbox" id="setSuara" ${suaraAktif_() ? 'checked' : ''} onchange="lsSet('labuku_suara', this.checked ? '1' : '0')">
+        <label class="form-check-label fw-semibold" for="setSuara">Suara panggilan (bel + nomor + nama)</label>
+      </div>
+      <div class="small text-secondary mb-2">Saat <b>Panggil</b> ditekan, speaker komputer membunyikan bel lalu menyebut nomor antrean & nama. Suara: ${v ? escapeHtml(v.name) : 'bawaan browser (bahasa Indonesia tidak ditemukan — gunakan Chrome/Edge terbaru)'}.</div>
+      <button class="btn btn-labuku-outline btn-sm" onclick="umumkanPanggilan_({ Nomor: 'A-001', PemohonNama: 'Contoh Nama Pemohon' })"><i class="bi bi-volume-up"></i> Coba suara</button>
+    </div>
+    <div class="lb-card">
+      <div class="form-check form-switch mb-1">
+        <input class="form-check-input" type="checkbox" id="setWaDesktop" ${lsGet('labuku_wa_desktop') === '1' ? 'checked' : ''} onchange="lsSet('labuku_wa_desktop', this.checked ? '1' : '')">
+        <label class="form-check-label fw-semibold" for="setWaDesktop">Buka WA di aplikasi WhatsApp Desktop</label>
+      </div>
+      <div class="small text-secondary">Khusus komputer yang sudah terpasang & masuk WhatsApp Desktop. Tombol WA langsung membuka aplikasinya, tidak lewat WA Web. Di HP selalu memakai aplikasi WhatsApp.</div>
+    </div>`);
 }
 
 /* ---------- Pilihan layanan: bisa diketik, yang paling sering dipakai di atas ---------- */
@@ -1355,16 +1516,37 @@ function katalogSorted() {
 /* v4: semua layanan tampil per kategori (klik untuk membuka), tetap bisa dicari; paling sering dipakai di atas. */
 const layananPickers = {};
 const NAMA_PILIH_LAIN = 'Lain-lain (tulis sendiri)';
-function layananPickerHtml(prefix, selectedId, lainTeks) {
-  const sel = katalogById(selectedId);
-  const lain = sel && sel.ID === KATALOG_LAIN.ID;
+/* v6.6: pilih lebih dari satu layanan sekaligus (maks. 5) — tiap layanan tetap jadi ID & nomor antrean sendiri. */
+const MAKS_LAYANAN = 5;
+const pilihanLayanan = {};
+function layananPickerHtml(prefix, selectedIds, lainTeks) {
+  const list = (Array.isArray(selectedIds) ? selectedIds : (selectedIds ? [selectedIds] : [])).filter(id => katalogById(id)).slice(0, MAKS_LAYANAN);
+  pilihanLayanan[prefix] = list;
+  const lain = list.indexOf(KATALOG_LAIN.ID) >= 0;
   return `
-    <input type="hidden" id="${prefix}Katalog" value="${sel ? sel.ID : ''}">
-    <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="Cari layanan..."
-      value="${sel ? escapeHtml(lain ? NAMA_PILIH_LAIN : sel.NamaLayanan) : ''}" oninput="document.getElementById('${prefix}Katalog').value='';document.getElementById('${prefix}Lain').style.display='none';renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
+    <input type="hidden" id="${prefix}Katalog" value="${list[0] || ''}">
+    <div class="pilihan-layanan" id="${prefix}Info">${chipLayananHtml_(prefix)}</div>
+    <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="${list.length ? 'Tambah layanan lain (opsional)...' : 'Cari layanan...'}"
+      value="" oninput="renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
     <div class="lpx-box" id="${prefix}List" style="display:none;"></div>
-    <div class="small text-secondary mt-1" id="${prefix}Info">${sel ? 'Dipilih: ' + escapeHtml(lain ? NAMA_PILIH_LAIN : sel.NamaLayanan) : ''}</div>
-    <input class="form-control lain-input" id="${prefix}Lain" maxlength="80" placeholder="Tulis layanan yang dibutuhkan" value="${escapeHtml(lainTeks || '')}"${prefix === 'ta' ? ' oninput="infoLanjutan_()"' : ''} style="${lain ? '' : 'display:none;'}">`;
+    <input class="form-control lain-input" id="${prefix}Lain" maxlength="80" placeholder="Tulis layanan yang dibutuhkan (Lain-lain)" value="${escapeHtml(lainTeks || '')}"${prefix === 'ta' ? ' oninput="infoLanjutan_()"' : ''} style="${lain ? '' : 'display:none;'}">`;
+}
+
+function namaPilihan_(id) { const k = katalogById(id); return !k ? id : (k.ID === KATALOG_LAIN.ID ? NAMA_PILIH_LAIN : k.NamaLayanan); }
+function chipLayananHtml_(prefix) {
+  const list = pilihanLayanan[prefix] || [];
+  return list.map(id => `<span class="chip-layanan" data-id="${escapeHtml(id)}">${escapeHtml(namaPilihan_(id))}<button type="button" aria-label="Hapus layanan" title="Hapus" onclick="hapusLayananPicker('${prefix}','${escapeHtml(id)}')">&times;</button></span>`).join('');
+}
+
+function segarkanPilihan_(prefix) {
+  const list = pilihanLayanan[prefix] || [];
+  document.getElementById(prefix + 'Katalog').value = list[0] || '';
+  document.getElementById(prefix + 'Info').innerHTML = chipLayananHtml_(prefix);
+  const cari = document.getElementById(prefix + 'Cari');
+  cari.placeholder = list.length ? 'Tambah layanan lain (opsional)...' : 'Cari layanan...';
+  const inp = document.getElementById(prefix + 'Lain');
+  if (inp) inp.style.display = list.indexOf(KATALOG_LAIN.ID) >= 0 ? '' : 'none';
+  if (prefix === 'ta') infoLanjutan_();
 }
 
 function renderLayananPicker(prefix) {
@@ -1372,27 +1554,35 @@ function renderLayananPicker(prefix) {
   if (!box) return;
   let p = layananPickers[prefix];
   if (!p || p.box !== box) {
-    p = { box: box, opts: { items: [], kategori: KATEGORI_LAYANAN_RESMI, onPick: it => pilihLayananPicker(prefix, it.id),
-      lain: { id: KATALOG_LAIN.ID, nama: NAMA_PILIH_LAIN, kategori: KATALOG_LAIN.Kategori, pakai: 0 } } };
+    p = { box: box, opts: { items: [], kategori: KATEGORI_LAYANAN_RESMI, onPick: it => pilihLayananPicker(prefix, it.id), lain: null } };
     p.ui = LabukuUI.LayananList(box, p.opts);
     layananPickers[prefix] = p;
   }
-  p.opts.items = (window.AppState.katalog || []).map(k => ({ id: k.ID, nama: k.NamaLayanan, kategori: k.Kategori, pakai: Number(k.Pemakaian) || 0 }));
-  const dipilih = document.getElementById(prefix + 'Katalog').value;
-  p.ui.render(dipilih ? '' : document.getElementById(prefix + 'Cari').value);
+  const dipilih = pilihanLayanan[prefix] || [];
+  p.opts.items = (window.AppState.katalog || []).filter(k => dipilih.indexOf(k.ID) < 0)
+    .map(k => ({ id: k.ID, nama: k.NamaLayanan, kategori: k.Kategori, pakai: Number(k.Pemakaian) || 0 }));
+  p.opts.lain = dipilih.indexOf(KATALOG_LAIN.ID) < 0 ? { id: KATALOG_LAIN.ID, nama: NAMA_PILIH_LAIN, kategori: KATALOG_LAIN.Kategori, pakai: 0 } : null;
+  p.ui.render(document.getElementById(prefix + 'Cari').value);
 }
 
 function pilihLayananPicker(prefix, id) {
   const k = katalogById(id);
   if (!k) return;
-  const lain = k.ID === KATALOG_LAIN.ID;
-  document.getElementById(prefix + 'Katalog').value = k.ID;
-  document.getElementById(prefix + 'Cari').value = lain ? NAMA_PILIH_LAIN : k.NamaLayanan;
-  document.getElementById(prefix + 'Info').textContent = 'Dipilih: ' + (lain ? NAMA_PILIH_LAIN : k.NamaLayanan);
+  const list = pilihanLayanan[prefix] || (pilihanLayanan[prefix] = []);
+  if (list.indexOf(k.ID) < 0) {
+    if (list.length >= MAKS_LAYANAN) { showToast('Peringatan', 'Maksimal ' + MAKS_LAYANAN + ' layanan sekali daftar.', 'warning'); return; }
+    list.push(k.ID);
+  }
+  document.getElementById(prefix + 'Cari').value = '';
   document.getElementById(prefix + 'List').style.display = 'none';
+  segarkanPilihan_(prefix);
   const inp = document.getElementById(prefix + 'Lain');
-  if (inp) { inp.style.display = lain ? '' : 'none'; if (lain) setTimeout(() => inp.focus(), 30); }
-  if (prefix === 'ta') infoLanjutan_();
+  if (inp && k.ID === KATALOG_LAIN.ID) setTimeout(() => inp.focus(), 30);
+}
+
+function hapusLayananPicker(prefix, id) {
+  pilihanLayanan[prefix] = (pilihanLayanan[prefix] || []).filter(x => x !== id);
+  segarkanPilihan_(prefix);
 }
 
 /* Wilayah adaptif (v5: luar kabupaten utama diketik, tanpa memuat data dari server). */
@@ -1412,7 +1602,7 @@ function openTambahAntrean(prefill) {
         <div class="col-md-6"><label class="form-label">Nomor WhatsApp</label><input class="form-control" id="taHp" inputmode="tel" placeholder="08xxxxxxxxxx" required value="${escapeHtml(p.noHp || '')}"></div>
         <div class="col-12"><label class="form-label">Alamat</label><div id="taWilayah"></div>
           <input class="form-control mt-2" id="taAlamat" maxlength="120" placeholder="Dusun / RT / RW (opsional)" value="${escapeHtml(p.alamat || '')}"></div>
-        <div class="col-12"><label class="form-label">Layanan</label>${layananPickerHtml('ta', p.katalogId, p.layananLain)}</div>
+        <div class="col-12"><label class="form-label">Layanan</label>${layananPickerHtml('ta', p.katalogIds || p.katalogId, p.layananLain)}</div>
       </div>
       <button type="submit" class="btn btn-labuku-primary w-100 mt-4"><i class="bi bi-ticket-perforated"></i> Terbitkan Nomor Antrean</button>
     </form>`);
@@ -1424,7 +1614,7 @@ function openTambahAntrean(prefill) {
     taWil = null;
     wilBox.innerHTML = '<div class="small text-danger">Data wilayah belum dimuat. Klik tombol Refresh di kanan atas.</div>';
   }
-  if (!p.katalogId) renderLayananPicker('ta');
+  if (!(pilihanLayanan.ta || []).length) renderLayananPicker('ta');
   infoLanjutan_();
 }
 
@@ -1494,10 +1684,10 @@ function popupPending(d) {
 function infoLanjutan_() {
   const box = document.getElementById('taLanjutInfo');
   if (!box) return;
-  const kat = (document.getElementById('taKatalog') || {}).value || '';
+  const dipilih = pilihanLayanan.ta || [];
   const lainTeks = String((document.getElementById('taLain') || {}).value || '').trim().toLowerCase();
-  const p = (window._pendingNik || []).find(x => x.katalogId === kat && (kat !== KATALOG_LAIN.ID || String(x.jenis).trim().toLowerCase() === lainTeks));
-  box.innerHTML = p ? `<div class="lanjut-info mb-3"><i class="bi bi-arrow-repeat"></i> Melanjutkan pending <b>${escapeHtml(p.id)}</b>${p.kekurangan && p.kekurangan.length ? ' · kekurangan dulu: ' + escapeHtml(p.kekurangan.join(', ')) : ''}${p.keterangan ? '<div class="small mt-1">Keterangan: ' + escapeHtml(p.keterangan) + '</div>' : ''}</div>` : '';
+  const cocok = (window._pendingNik || []).filter(x => dipilih.indexOf(x.katalogId) >= 0 && (x.katalogId !== KATALOG_LAIN.ID || String(x.jenis).trim().toLowerCase() === lainTeks));
+  box.innerHTML = cocok.map(p => `<div class="lanjut-info mb-2"><i class="bi bi-arrow-repeat"></i> Melanjutkan pending <b>${escapeHtml(p.id)}</b>${p.kekurangan && p.kekurangan.length ? ' · kekurangan dulu: ' + escapeHtml(p.kekurangan.join(', ')) : ''}${p.keterangan ? '<div class="small mt-1">Keterangan: ' + escapeHtml(p.keterangan) + '</div>' : ''}</div>`).join('');
 }
 
 function popupPengunjungLama(nama) {
@@ -1526,28 +1716,34 @@ function submitTambahAntrean() {
     nama: namaKapital(document.getElementById('taNama').value),
     noHp: document.getElementById('taHp').value.trim(),
     alamat: document.getElementById('taAlamat').value.trim(),
-    katalogId: document.getElementById('taKatalog').value
+    katalogId: (pilihanLayanan.ta || [])[0] || ''
   };
   const wil = taWil ? taWil.getValue() : { ok: false, error: 'Data wilayah belum dimuat. Klik tombol Refresh.' };
   if (!wil.ok) { showToast('Peringatan', wil.error, 'warning'); return; }
   data.wilayah = wil.data;
-  if (!data.katalogId) { showToast('Peringatan', 'Pilih layanan dari daftar.', 'warning'); renderLayananPicker('ta'); return; }
-  if (data.katalogId === KATALOG_LAIN.ID) {
+  const dipilih = (pilihanLayanan.ta || []).slice();
+  if (!dipilih.length) { showToast('Peringatan', 'Pilih layanan dari daftar.', 'warning'); renderLayananPicker('ta'); return; }
+  if (dipilih.indexOf(KATALOG_LAIN.ID) >= 0) {
     data.layananLain = String(document.getElementById('taLain').value || '').replace(/\s+/g, ' ').trim();
     if (data.layananLain.length < 3) { showToast('Peringatan', 'Tuliskan layanan yang dibutuhkan (Lain-lain).', 'warning'); document.getElementById('taLain').focus(); return; }
   }
-  lastTambahData = Object.assign({}, data, { wilayahState: taWil.getState(), pendingNik: window._pendingNik || [] });
+  // v6.6: daftar layanan (satu atau lebih); katalogId tetap diisi layanan pertama (cocok dengan server lama)
+  data.layanan = dipilih.map(id => ({ katalogId: id, layananLain: id === KATALOG_LAIN.ID ? data.layananLain : '' }));
+  if (data.katalogId !== KATALOG_LAIN.ID) delete data.layananLain;
+  lastTambahData = Object.assign({}, data, { katalogIds: dipilih, layananLain: data.layanan.filter(x => x.layananLain).map(x => x.layananLain)[0] || '', wilayahState: taWil.getState(), pendingNik: window._pendingNik || [] });
   closeFormModal();
 
-  const kat = katalogById(data.katalogId);
-  if (kat) kat.Pemakaian = (Number(kat.Pemakaian) || 0) + 1;
-  const temp = { ID: 'tmp-' + Date.now(), _temp: true, Nomor: '…', PemohonNama: data.nama, LayananNama: data.layananLain || (kat ? kat.NamaLayanan : ''), LayananID: '', KatalogID: data.katalogId,
-    Status: 'Menunggu', LayananStatus: 'Antre', NoHP: data.noHp, Sumber: 'Loket', Waktu: new Date().toISOString() };
-  window.AppState.fo.push(temp);
+  const temps = data.layanan.map((it, i) => {
+    const kat = katalogById(it.katalogId);
+    if (kat && kat.ID !== KATALOG_LAIN.ID) kat.Pemakaian = (Number(kat.Pemakaian) || 0) + 1;
+    return { ID: 'tmp-' + Date.now() + '-' + i, _temp: true, Nomor: '…', PemohonNama: data.nama, LayananNama: it.layananLain || (kat ? kat.NamaLayanan : ''), LayananID: '', KatalogID: it.katalogId,
+      Status: 'Menunggu', LayananStatus: 'Antre', NoHP: data.noHp, Sumber: 'Loket', Waktu: new Date().toISOString() };
+  });
+  temps.forEach(t => window.AppState.fo.push(t));
   pendingStart();
   renderFoTable();
 
-  const removeTemp = () => { window.AppState.fo = window.AppState.fo.filter(x => x.ID !== temp.ID); };
+  const removeTemp = () => { const ids = temps.map(t => t.ID); window.AppState.fo = window.AppState.fo.filter(x => ids.indexOf(x.ID) < 0); };
   gsr(function (res) {
     pendingEnd();
     removeTemp();
@@ -1557,13 +1753,16 @@ function submitTambahAntrean() {
       openTambahAntrean(lastTambahData);
       return;
     }
-    window.AppState.fo.push(res.data);
-    if (res.data.LanjutanDari) { // v6.4: pending lama → "Dilanjutkan"
-      window.AppState.fo.forEach(x => { if (x.LayananID === res.data.LanjutanDari) x.LayananStatus = 'Dilanjutkan'; });
-      showToast('Lanjutan', res.message || ('Melanjutkan ' + res.data.LanjutanDari), 'info');
-    }
+    const rows = res.data.rows || [res.data]; // v6.6: bisa lebih dari satu layanan
+    rows.forEach(row => {
+      window.AppState.fo.push(row);
+      if (row.LanjutanDari) { // v6.4: pending lama → "Dilanjutkan"
+        window.AppState.fo.forEach(x => { if (x.LayananID === row.LanjutanDari) x.LayananStatus = 'Dilanjutkan'; });
+      }
+    });
+    if (rows.some(r => r.LanjutanDari)) showToast('Lanjutan', res.message || 'Melanjutkan layanan pending.', 'info');
     renderFoTable(); saveFoToCache();
-    showAntreanDibuat(res.data);
+    showAntreanDibuat(rows);
   }, function (err) {
     pendingEnd(); removeTemp(); renderFoTable();
     showToast('Error', err.message || err, 'danger');
@@ -1572,13 +1771,15 @@ function submitTambahAntrean() {
 }
 
 
-function showAntreanDibuat(row) {
+function showAntreanDibuat(rows) {
+  rows = Array.isArray(rows) ? rows : [rows];
+  const row = rows[0];
   const sisa = sisaSebelum(row.ID);
-  openFormModal('Antrean Diterbitkan', `
+  openFormModal(rows.length > 1 ? 'Antrean Diterbitkan (' + rows.length + ' layanan)' : 'Antrean Diterbitkan', `
     <div class="ptsp-ticket-card mb-3">
       <div class="ptsp-ticket-label">Nomor Antrean</div>
-      <div class="ptsp-ticket-num">${escapeHtml(row.Nomor)}</div>
-      <div class="ptsp-service-chip"><div class="text-start"><div class="small opacity-75">${escapeHtml(namaKapital(row.PemohonNama))}</div><div class="fw-semibold">${escapeHtml(row.LayananNama)}</div></div></div>
+      ${rows.map(r => `<div class="ptsp-ticket-num${rows.length > 1 ? ' ptsp-ticket-num-kecil' : ''}">${escapeHtml(r.Nomor)}</div>
+      <div class="ptsp-service-chip"><div class="text-start"><div class="small opacity-75">${escapeHtml(namaKapital(r.PemohonNama))}</div><div class="fw-semibold">${escapeHtml(r.LayananNama)}</div></div></div>`).join('')}
     </div>
     <p class="text-center small text-secondary">${sisa > 0 ? sisa + ' antrean menunggu sebelum pemohon ini.' : 'Pemohon ini antrean berikutnya.'}</p>
     <button class="btn btn-labuku-accent w-100" onclick="waAntrean('${row.ID}')"><i class="bi bi-whatsapp"></i> Kirim Nomor Antrean via WhatsApp</button>`);

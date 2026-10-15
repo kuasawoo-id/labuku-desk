@@ -786,3 +786,22 @@ table.lb-table tbody td { padding: .9rem 1.1rem; }
   [data-theme="dark"] body[data-sec="frontoffice"] .fab-tambah { background: #2d6a4f; }
 }
 @media (max-width: 991.98px) { [data-theme="dark"] .bottom-nav button.active { color: #95d5b2; } [data-theme="dark"] .bottom-nav button.active i { color: #1B4332; } }
+
+/* ══ v6.6: pilih banyak layanan, WA massal & penanda WA terkirim ══ */
+.pilihan-layanan { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+.pilihan-layanan:empty { display: none; }
+.chip-layanan { display: inline-flex; align-items: center; gap: .3rem; background: var(--success-bg); color: var(--primary); border: 1px solid color-mix(in srgb, var(--primary) 30%, transparent);
+  border-radius: 999px; padding: .25rem .35rem .25rem .75rem; font-size: .86rem; font-weight: 600; }
+.chip-layanan button { border: 0; background: rgba(0,0,0,.08); color: inherit; width: 1.35rem; height: 1.35rem; border-radius: 50%; line-height: 1; font-size: 1rem; padding: 0; }
+.chip-layanan button:hover { background: rgba(0,0,0,.16); }
+[data-theme="dark"] .chip-layanan { color: #95d5b2; background: rgba(82,183,136,.14); }
+.btn-ikon-aksi { position: relative; }
+.btn-ikon-aksi.wa-sudah { color: #1a9e55; border-color: color-mix(in srgb, #1a9e55 45%, transparent); }
+.btn-ikon-aksi .wa-cek { position: absolute; top: -5px; right: -5px; font-size: .72rem; color: #1a9e55; background: var(--bg-card); border-radius: 50%; line-height: 1; }
+.wa-massal-list { max-height: 45vh; overflow-y: auto; border: 1px solid var(--outline); border-radius: 12px; }
+.wa-massal-item { display: flex; align-items: center; gap: .5rem; padding: .5rem .75rem; border-bottom: 1px solid var(--outline); font-size: .9rem; }
+.wa-massal-item:last-child { border-bottom: 0; }
+.wa-massal-item span:not(.badge-status) { flex: 1; color: var(--text-neutral); }
+.wa-massal-item.aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg-card)); }
+.ptsp-ticket-num-kecil { font-size: 1.8rem; margin-top: .75rem; }
+#foWaMassalN { font-size: .72rem; vertical-align: middle; }

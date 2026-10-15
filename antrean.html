@@ -25,7 +25,14 @@
     .hp { position: absolute; left: -5000px; width: 1px; height: 1px; overflow: hidden; }
     .err { color: #991B1B; font-size: .85rem; }
     .lpx-box { background: #fff; }
-    .pilihan { font-size: .85rem; color: #1B4332; font-weight: 600; }
+    .pilihan { display: flex; flex-wrap: wrap; gap: .35rem; margin-bottom: .4rem; }
+    .pilihan:empty { display: none; }
+    .chip-l { display: inline-flex; align-items: center; gap: .3rem; background: #DCFCE7; color: #1B4332; border: 1px solid rgba(27,67,50,.3); border-radius: 999px; padding: .3rem .35rem .3rem .8rem; font-size: .9rem; font-weight: 600; }
+    .chip-l button { border: 0; background: rgba(0,0,0,.08); color: inherit; width: 1.5rem; height: 1.5rem; border-radius: 50%; line-height: 1; font-size: 1.05rem; padding: 0; }
+    .ticket .num.kecil { font-size: 2rem; line-height: 1.25; }
+    .btn-kontak { background: #fff; color: #1B4332; border: 2px solid #1B4332; border-radius: 10px; font-weight: 600; padding: .7rem; }
+    .btn-kontak:hover { background: #F0FDF4; color: #1B4332; }
+    .langkah { font-size: .85rem; color: #475569; text-align: center; margin: .25rem 0 .6rem; }
     #fNama { text-transform: uppercase; }
     /* v6.1 HP: huruf input 16px (iOS tidak memperbesar layar), daftar layanan lebih mudah diketuk */
     @media (max-width: 575.98px) {
@@ -63,11 +70,11 @@
           <input class="form-control mt-2" id="fAlamat" maxlength="120" placeholder="Dusun / RT / RW (opsional)">
         </div>
         <div class="mb-3">
-          <label class="form-label" for="fCari">Layanan yang Dituju</label>
+          <label class="form-label" for="fCari">Layanan yang Dituju <span class="fw-normal text-secondary">(boleh lebih dari satu)</span></label>
           <input type="hidden" id="fLayanan" value="">
+          <div class="pilihan" id="fInfo"></div>
           <input class="form-control" id="fCari" autocomplete="off" placeholder="Cari layanan...">
           <div class="lpx-box" id="fList"></div>
-          <div class="small text-secondary mt-1" id="fInfo"></div>
           <input class="form-control mt-2" id="fLain" maxlength="80" style="display:none;" placeholder="Tulis layanan yang dibutuhkan">
         </div>
         <div class="hp" aria-hidden="true"><label>Website <input id="fWebsite" tabindex="-1" autocomplete="off"></label></div>
@@ -89,7 +96,12 @@
         </div>
       </div>
       <p class="text-center text-secondary small mt-3">Screenshot layar ini, lalu tunggu panggilan. Bawa berkas persyaratan asli.</p>
-      <a class="btn btn-go w-100 mb-2" id="tWaKua" style="display:none;" href="#"><span id="tWaKuaTeks">Kirim ke WhatsApp KUA</span></a>
+      <!-- v6.6: simpan nomor KUA di HP dulu, lalu kirim WA (tidak pindah otomatis) -->
+      <div id="tKuaBox" style="display:none;">
+        <p class="langkah">Simpan nomor WhatsApp KUA agar informasi layanan dari kami sampai ke HP Anda.</p>
+        <a class="btn btn-kontak w-100 mb-2" id="tKontak" href="#" download="Kontak KUA.vcf">1. Simpan Kontak KUA</a>
+        <a class="btn btn-go w-100 mb-2" id="tWaKua" href="#"><span id="tWaKuaTeks">2. Kirim WA ke KUA</span></a>
+      </div>
       <button class="btn btn-outline-secondary w-100" type="button" onclick="resetForm()">Daftar untuk orang lain</button>
     </div>
   </div>
@@ -115,24 +127,26 @@
       (FORM_DATA.groups || []).forEach(function (g) {
         g.items.forEach(function (it) { LAYANAN.push({ id: it.id, nama: it.nama, kategori: g.kategori, pakai: it.pakai || 0 }); });
       });
-      PICKER = LabukuUI.LayananList(el('fList'), {
+      OPTS = {
         items: LAYANAN,
         kategori: (FORM_DATA.groups || []).map(function (g) { return g.kategori; }),
-        lain: { id: '__LAIN__', nama: 'Lain-lain (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 },
+        lain: LAIN,
         onPick: function (l) {
-          el('fLayanan').value = l.id; el('fCari').value = l.nama;
+          /* v6.6: boleh memilih lebih dari satu layanan (maks. 5); tiap layanan dapat nomor antrean sendiri */
+          if (!PILIH.some(function (x) { return x.id === l.id; })) {
+            if (PILIH.length >= 5) { el('fErr').textContent = 'Maksimal 5 layanan sekali daftar.'; return; }
+            PILIH.push({ id: l.id, nama: l.nama });
+          }
+          el('fCari').value = '';
+          segarkanPilihan();
           /* v6.4: Lain-lain → pemohon menulis sendiri layanan yang dibutuhkan */
-          el('fLain').style.display = l.id === '__LAIN__' ? '' : 'none';
-          if (l.id === '__LAIN__') setTimeout(function () { el('fLain').focus(); }, 30);
-          el('fInfo').innerHTML = '';
-          var p = document.createElement('span'); p.className = 'pilihan'; p.textContent = 'Dipilih: ' + l.nama;
-          el('fInfo').appendChild(p);
           PICKER.hide();
         }
-      });
+      };
+      PICKER = LabukuUI.LayananList(el('fList'), OPTS);
       PICKER.render('');
-      el('fCari').addEventListener('input', function () { el('fLayanan').value = ''; el('fLain').style.display = 'none'; PICKER.render(el('fCari').value); });
-      el('fCari').addEventListener('focus', function () { PICKER.render(el('fLayanan').value ? '' : el('fCari').value); });
+      el('fCari').addEventListener('input', function () { saringPicker(); PICKER.render(el('fCari').value); });
+      el('fCari').addEventListener('focus', function () { saringPicker(); PICKER.render(el('fCari').value); });
       if (FORM_DATA.wilayahHome) {
         WIL = LabukuUI.Wilayah(el('fWilayah'), { home: FORM_DATA.wilayahHome, id: 'fW' });
       } else {
@@ -143,6 +157,33 @@
 
     var LAYANAN = [];
     var PICKER = null;
+    var OPTS = null;
+    var PILIH = [];
+    var LAIN = { id: '__LAIN__', nama: 'Lain-lain (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 };
+
+    /* v6.6: layanan yang sudah dipilih tampil sebagai chip (bisa dihapus) dan tidak muncul lagi di daftar */
+    function saringPicker() {
+      if (!OPTS) return;
+      var ids = PILIH.map(function (x) { return x.id; });
+      OPTS.items = LAYANAN.filter(function (l) { return ids.indexOf(l.id) === -1; });
+      OPTS.lain = ids.indexOf('__LAIN__') === -1 ? LAIN : null;
+    }
+    function segarkanPilihan() {
+      var box = el('fInfo');
+      box.innerHTML = '';
+      PILIH.forEach(function (x, i) {
+        var c = document.createElement('span'); c.className = 'chip-l';
+        c.appendChild(document.createTextNode(x.nama));
+        var b = document.createElement('button'); b.type = 'button'; b.setAttribute('aria-label', 'Hapus layanan'); b.textContent = '\u00d7';
+        b.addEventListener('click', function () { PILIH.splice(i, 1); segarkanPilihan(); });
+        c.appendChild(b); box.appendChild(c);
+      });
+      el('fLayanan').value = PILIH.length ? PILIH[0].id : '';
+      el('fCari').placeholder = PILIH.length ? 'Tambah layanan lain (opsional)...' : 'Cari layanan...';
+      el('fLain').style.display = PILIH.some(function (x) { return x.id === '__LAIN__'; }) ? '' : 'none';
+      el('fErr').textContent = '';
+      saringPicker();
+    }
     var WIL = null;
 
     function kirim() {
@@ -151,9 +192,10 @@
       var nik = el('fNik').value.replace(/\D/g, '');
       var wil = WIL ? WIL.getValue() : { ok: false, error: 'Data wilayah belum tersedia.' };
       if (!wil.ok) { el('fErr').textContent = wil.error; el('fWilayah').scrollIntoView({ block: 'center' }); return; }
-      if (!el('fLayanan').value) { el('fErr').textContent = 'Pilih layanan dari daftar.'; PICKER.render(el('fCari').value); return; }
+      if (!PILIH.length) { el('fErr').textContent = 'Pilih layanan dari daftar.'; saringPicker(); PICKER.render(el('fCari').value); return; }
       var lain = el('fLain').value.replace(/\s+/g, ' ').trim();
-      if (el('fLayanan').value === '__LAIN__' && lain.length < 3) { el('fErr').textContent = 'Tuliskan layanan yang dibutuhkan.'; el('fLain').focus(); return; }
+      var adaLain = PILIH.some(function (x) { return x.id === '__LAIN__'; });
+      if (adaLain && lain.length < 3) { el('fErr').textContent = 'Tuliskan layanan yang dibutuhkan.'; el('fLain').focus(); return; }
       el('fErr').textContent = '';
       var btn = el('fBtn');
       btn.disabled = true; btn.textContent = 'Memproses...';
@@ -163,15 +205,17 @@
         noHp: el('fHp').value.trim(),
         alamat: el('fAlamat').value.trim(),
         wilayah: wil.data,
-        katalogId: el('fLayanan').value,
-        layananLain: el('fLayanan').value === '__LAIN__' ? lain : '',
+        katalogId: PILIH[0].id,
+        layananLain: PILIH[0].id === '__LAIN__' ? lain : '',
+        layanan: PILIH.map(function (x) { return { katalogId: x.id, layananLain: x.id === '__LAIN__' ? lain : '' }; }),
         website: el('fWebsite').value
       };
       google.script.run
         .withSuccessHandler(function (res) {
           btn.disabled = false; btn.textContent = 'Ambil Nomor Antrean';
           if (!res || !res.success) { el('fErr').textContent = (res && res.message) || 'Gagal mendaftar. Coba lagi.'; return; }
-          el('tNum').textContent = res.data.nomor;
+          el('tNum').textContent = res.data.tiket && res.data.tiket.length > 1 ? res.data.tiket.map(function (t) { return t.nomor; }).join(' · ') : res.data.nomor;
+          el('tNum').className = 'num' + (res.data.tiket && res.data.tiket.length > 1 ? ' kecil' : '');
           el('tNama').textContent = res.data.nama;
           el('tLayanan').textContent = res.data.layanan;
           el('tTgl').textContent = res.data.tanggal;
@@ -188,25 +232,33 @@
         .daftarAntreanPublik(data);
     }
 
-    /* v6.4: setelah tiket tampil sebentar, WhatsApp langsung terbuka ke nomor KUA (Pengaturan → Umum)
-       dengan pesan dari template "Pesan pengunjung ke KUA". */
+    /* v6.6: setelah tiket tampil → tombol "1. Simpan Kontak KUA" (kartu kontak .vcf → layar Tambah kontak di HP)
+       dan "2. Kirim WA ke KUA" (pesan dari template "Pengunjung → WA KUA"). Tidak pindah halaman otomatis. */
+    var KONTAK_URL = null;
+    function teksVcard(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/([,;])/g, '\\$1').replace(/\r?\n/g, ' '); }
     function waKeKua(d, hp) {
       var nomor = FORM_DATA && FORM_DATA.waKua;
       if (!nomor) return;
-      var vars = { nama: d.nama, nomor: d.nomor, layanan: d.layanan, tanggal: d.tanggal, hp: hp, sisa: d.sisa, instansi: FORM_DATA.instansi || 'KUA' };
+      var instansi = FORM_DATA.instansi || 'KUA';
+      var vars = { nama: d.nama, nomor: d.nomor, layanan: d.layanan, tanggal: d.tanggal, hp: hp, sisa: d.sisa, instansi: instansi };
       var tpl = FORM_DATA.waKuaTpl || 'Nomor antrean: {nomor}\nNama: {nama}\nLayanan: {layanan}';
       var pesan = tpl.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m; });
-      var url = 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pesan);
-      var a = el('tWaKua');
-      a.href = url; a.style.display = '';
-      el('tWaKuaTeks').textContent = 'Membuka WhatsApp KUA...';
-      setTimeout(function () { el('tWaKuaTeks').textContent = 'Kirim ke WhatsApp KUA'; location.href = url; }, 1200);
+      el('tWaKua').href = 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pesan);
+      var vcf = ['BEGIN:VCARD', 'VERSION:3.0', 'N:;' + teksVcard(instansi) + ';;;', 'FN:' + teksVcard(instansi), 'ORG:' + teksVcard(instansi),
+        'TEL;TYPE=CELL,VOICE:+' + nomor, 'NOTE:' + teksVcard('WhatsApp layanan ' + instansi), 'END:VCARD'].join('\r\n') + '\r\n';
+      try {
+        if (KONTAK_URL) URL.revokeObjectURL(KONTAK_URL);
+        KONTAK_URL = URL.createObjectURL(new Blob([vcf], { type: 'text/vcard;charset=utf-8' }));
+        el('tKontak').href = KONTAK_URL;
+      } catch (e) { el('tKontak').href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcf); }
+      el('tKontak').setAttribute('download', instansi.replace(/[^\w\s.-]/g, '').trim() + '.vcf');
+      el('tKuaBox').style.display = '';
     }
 
     function resetForm() {
       el('fForm').reset();
-      el('fLain').style.display = 'none'; el('tWaKua').style.display = 'none';
-      el('fLayanan').value = ''; el('fInfo').textContent = '';
+      el('fLain').style.display = 'none'; el('tKuaBox').style.display = 'none';
+      PILIH = []; segarkanPilihan();
       if (PICKER) PICKER.render('');
       if (WIL) WIL.setMode('utama');
       el('ticketBox').style.display = 'none';
