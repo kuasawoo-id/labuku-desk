@@ -40,6 +40,10 @@
     .panggil .tujuan { display: inline-block; background: var(--aksen); color: var(--aksen-teks); font-weight: 800; border-radius: 999px; padding: calc(var(--u) * .5) calc(var(--u) * 2); font-size: calc(var(--u) * 2.2); text-transform: uppercase; letter-spacing: .04em; }
     .panggil .nama { font-size: calc(var(--u) * 2.6); font-weight: 700; margin-top: calc(var(--u) * 1.2); }
     .panggil .lay { font-size: calc(var(--u) * 1.7); color: var(--teks2); margin-top: calc(var(--u) * .4); }
+    /* v6.9: panggilan ambil berkas — label & pita tujuan emas */
+    .panggil.ambil .label { color: #B8860B; }
+    .panggil.ambil .tujuan { background: #D4A017; color: #1B4332; }
+    .riwayat b.ambil::after { content: ' berkas'; font-size: .5em; font-weight: 700; color: #B8860B; text-transform: uppercase; letter-spacing: .06em; }
     .panggil.baru { animation: kedip 1s ease-in-out 5; }
     @keyframes kedip { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 calc(var(--u) * .5) var(--aksen); } }
     .daftar { display: flex; flex-direction: column; gap: calc(var(--u) * .7); margin-top: calc(var(--u) * 1); overflow: hidden; }
@@ -58,6 +62,7 @@
     .chip b { display: block; font-size: calc(var(--u) * 2.4); }
     .chip span { font-size: calc(var(--u) * 1); color: var(--teks2); text-transform: uppercase; letter-spacing: .06em; }
     .riwayat { display: flex; gap: calc(var(--u) * 1.2); align-items: center; flex-wrap: wrap; }
+    #mRiwayat { display: flex; gap: calc(var(--u) * 1.2); align-items: center; flex-wrap: wrap; }
     .riwayat b { font-size: calc(var(--u) * 2); color: var(--teks2); font-variant-numeric: tabular-nums; }
     .slide { position: relative; flex: 1; min-height: calc(var(--u) * 10); border-radius: calc(var(--u) * 1.4); overflow: hidden; background: rgba(0,0,0,.2); }
     .slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .8s; }
@@ -105,8 +110,11 @@
     /* Status koneksi & pengaturan layar */
     #status { position: absolute; right: calc(var(--u) * .6); bottom: calc(var(--u) * .4); width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; opacity: .5; z-index: 5; }
     #status.putus { background: #e74c3c; opacity: 1; }
-    #gear { position: fixed; top: 12px; right: 12px; z-index: 30; border: 0; border-radius: 50%; width: 46px; height: 46px; background: rgba(0,0,0,.6); color: #fff; font-size: 24px; cursor: pointer; transition: opacity .3s; }
-    body.idle #gear { opacity: 0; pointer-events: none; }
+    #gear { position: fixed; left: 10px; bottom: 10px; z-index: 30; border: 0; border-radius: 50%; width: 40px; height: 40px; background: rgba(0,0,0,.55); color: #fff; font-size: 21px; cursor: pointer; transition: opacity .25s; opacity: 0; }
+    body.dekat-gear #gear, #gear:focus-visible { opacity: .9; }
+    body.idle #gear { opacity: 0; }
+    #hintPenuh { position: fixed; left: 50%; bottom: 16px; transform: translateX(-50%); z-index: 25; background: rgba(0,0,0,.7); color: #fff; padding: 8px 16px; border-radius: 999px; font: 600 14px/1.3 system-ui, sans-serif; pointer-events: none; transition: opacity .3s; white-space: nowrap; }
+    #hintPenuh.sembunyi-h, body.idle #hintPenuh { opacity: 0; }
     #panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); background: #fff; color: #10291f; z-index: 40; padding: 18px; overflow-y: auto; box-shadow: -8px 0 30px rgba(0,0,0,.35); font-size: 14px; display: none; }
     #panel.buka { display: block; }
     #panel h3 { margin: 0 0 4px; font-size: 18px; }
@@ -134,7 +142,7 @@
     <main class="isi">
       <section class="kol kol-utama">
         <div class="kartu panggil" id="mPanggil">
-          <div class="label">Nomor dipanggil</div>
+          <div class="label" id="mLabel">Nomor dipanggil</div>
           <div class="nomor" id="mNomor">–</div>
           <div><span class="tujuan" id="mTujuan">LOKET</span></div>
           <div class="nama" id="mNama"></div>
@@ -154,7 +162,8 @@
     <div id="status" title="Koneksi"></div>
   </div>
 
-  <button id="gear" title="Atur layar ini" aria-label="Atur layar ini">⚙</button>
+  <button id="gear" title="Atur layar ini (tombol S)" aria-label="Atur layar ini">⚙</button>
+  <div id="hintPenuh" class="sembunyi-h">Klik di mana saja untuk layar penuh · ⚙ di pojok kiri bawah / tombol S</div>
   <aside id="panel" aria-label="Pengaturan layar ini">
     <h3>Atur layar ini</h3>
     <p class="ket">Tersimpan di komputer ini saja. Isi monitor (teks berjalan, judul, bagian yang tampil) diatur Kepala KUA di <b>Pengaturan → Monitor</b>.</p>
@@ -173,6 +182,8 @@
     <div class="dua"><input type="number" id="pX" min="0" max="7680" step="10" placeholder="Kiri"><input type="number" id="pY" min="0" max="4320" step="10" placeholder="Atas"></div>
     <label for="pSkala">Ukuran huruf: <b id="pSkalaLb">100%</b></label>
     <input type="range" id="pSkala" min="50" max="200" step="5" style="width:100%">
+    <label><input type="checkbox" id="pPenuhOto"> Otomatis layar penuh saat layar diklik</label>
+    <p class="ket" style="margin:2px 0 0">Browser hanya mengizinkan layar penuh setelah ada klik/tombol ditekan. Setelah dibuka atau dimuat ulang, klik sekali di mana saja di monitor.</p>
     <label><input type="checkbox" id="pSuara"> Bunyikan panggilan di layar ini</label>
     <p class="ket" style="margin:2px 0 0">Nyalakan bila monitor ini dijalankan di komputer lain. Bila di komputer yang sama dengan loket, biarkan mati agar suara tidak dobel.</p>
     <div class="tombol">
@@ -190,7 +201,7 @@
   (function () {
     'use strict';
     var KUNCI_LAYAR = 'labuku_monitor_layar';
-    var SETEL_AWAL = { tata: 'lebar', lebar: 0, tinggi: 0, x: 0, y: 0, skala: 100, suara: false };
+    var SETEL_AWAL = { tata: 'lebar', lebar: 0, tinggi: 0, x: 0, y: 0, skala: 100, suara: false, penuhOto: true };
     var KECEPATAN = { lambat: 45, sedang: 80, cepat: 130 }; // piksel per detik
     var ANGKA = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
     var D = null, idSekarang = null, pertama = true, slideIdx = 0, slideTimer = null, tarikTimer = null, teksTerakhir = '', qrDibuat = false;
@@ -276,8 +287,9 @@
       if (!layar().suara || !s || !window.speechSynthesis) return;
       var cfg = (D && D.suara) || {};
       var nomor = String(s.nomor || '').split('').map(function (c) { return /\d/.test(c) ? ANGKA[+c] : (/[a-z]/i.test(c) ? c.toUpperCase() : ''); }).filter(Boolean).join(' ');
-      var vars = { nomor: nomor, nama: String(s.namaUcap || '').toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }), layanan: s.layanan || '', tujuan: cfg.suara_tujuan || 'loket', instansi: (D && D.instansi) || 'KUA' };
-      var kal = String(cfg.suara_kalimat || 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.').replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined ? vars[k] : m; });
+      var ambil = s.jenis === 'ambil'; // v6.9
+      var vars = { nomor: nomor, nama: String(s.namaUcap || '').toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }), layanan: s.layanan || '', tujuan: (ambil ? cfg.suara_tujuan_ambil || 'meja PTSP' : cfg.suara_tujuan) || 'loket', instansi: (D && D.instansi) || 'KUA' };
+      var kal = String((ambil ? cfg.suara_kalimat_ambil || 'Nomor antrean, {nomor}, atas nama {nama}, berkas {layanan} sudah selesai. Silakan ambil di {tujuan}.' : cfg.suara_kalimat) || 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.').replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined ? vars[k] : m; });
       window.__ucapMonitor = kal;
       try {
         window.speechSynthesis.cancel();
@@ -298,7 +310,10 @@
       var tujuan = String((D.suara && D.suara.suara_tujuan) || 'loket');
       var s = D.sekarang;
       teks('mNomor', s ? s.nomor : '–');
-      teks('mTujuan', s ? 'menuju ' + tujuan : 'Belum ada panggilan');
+      var ambil = !!(s && s.jenis === 'ambil'); // v6.9
+      el('mPanggil').classList.toggle('ambil', ambil);
+      teks('mLabel', ambil ? 'Ambil berkas' : 'Nomor dipanggil');
+      teks('mTujuan', s ? (ambil ? 'ambil di ' + String((D.suara && D.suara.suara_tujuan_ambil) || 'meja PTSP') : 'menuju ' + tujuan) : 'Belum ada panggilan');
       teks('mNama', s ? s.nama : ''); tampil('mNama', !!(s && s.nama));
       teks('mLay', s ? s.layanan : ''); tampil('mLay', !!(s && s.layanan && t.layanan !== false));
       if (s && s.id !== idSekarang) {
@@ -310,7 +325,7 @@
         return '<div class="baris"><b>' + esc(b.nomor) + '</b><span>' + esc([b.nama, t.layanan !== false ? b.layanan : ''].filter(Boolean).join(' · ')) + '</span></div>';
       }).join('') : '<div class="kosong">Tidak ada antrean menunggu</div>';
       tampil('mBerikutBox', t.berikutnya !== false);
-      el('mRiwayat').innerHTML = (D.riwayat || []).map(function (r) { return '<b>' + esc(r.nomor) + '</b>'; }).join('') || '<span class="kosong" style="margin:0">–</span>';
+      el('mRiwayat').innerHTML = (D.riwayat || []).map(function (r) { return '<b' + (r.jenis === 'ambil' ? ' class="ambil"' : '') + '>' + esc(r.nomor) + '</b>'; }).join('') || '<span class="kosong" style="margin:0">–</span>';
       tampil('mRiwayatBox', t.riwayat !== false);
       var rk = D.ringkasan || {};
       el('mRingkas').innerHTML = [['Antrean hari ini', rk.total], ['Menunggu', rk.menunggu], ['Selesai', rk.selesai]].map(function (x) { return '<div class="chip"><b>' + (x[1] || 0) + '</b><span>' + x[0] + '</span></div>'; }).join('');
@@ -346,11 +361,11 @@
       var kanal = new BroadcastChannel('labuku_monitor');
       kanal.onmessage = function (ev) {
         var m = ev.data || {};
-        if (m.tipe === 'panggil' && m.row && D) {
+        if ((m.tipe === 'panggil' || m.tipe === 'ambil') && m.row && D) {
           // langsung tampil (optimistik), lalu dicocokkan dengan server
           var r = m.row, mode = (D.monitor && D.monitor.nama) || 'samar';
           if (D.sekarang && D.sekarang.id !== r.ID) D.riwayat = [D.sekarang].concat(D.riwayat || []).slice(0, 3);
-          D.sekarang = { id: r.ID, nomor: r.Nomor, nama: samarkan(r.PemohonNama, mode), namaUcap: r.PemohonNama, layanan: r.LayananNama || '' };
+          D.sekarang = { id: r.ID, nomor: r.Nomor, nama: samarkan(r.PemohonNama, mode), namaUcap: r.PemohonNama, layanan: r.LayananNama || '', jenis: m.tipe }; // v6.9: jenis ambil = ambil berkas
           D.berikut = (D.berikut || []).filter(function (b) { return b.id !== r.ID; });
           render();
         }
@@ -365,13 +380,13 @@
     function isiPanel() {
       var s = layar();
       el('pTata').value = s.tata; el('pLebar').value = s.lebar || 0; el('pTinggi').value = s.tinggi || 0;
-      el('pX').value = s.x || 0; el('pY').value = s.y || 0; el('pSkala').value = s.skala; el('pSkalaLb').textContent = s.skala + '%'; el('pSuara').checked = !!s.suara;
+      el('pX').value = s.x || 0; el('pY').value = s.y || 0; el('pSkala').value = s.skala; el('pSkalaLb').textContent = s.skala + '%'; el('pSuara').checked = !!s.suara; el('pPenuhOto').checked = s.penuhOto !== false;
     }
     function bacaPanel() {
       var n = function (id) { var v = Math.round(Number(el(id).value)); return isNaN(v) || v < 0 ? 0 : v; };
-      return { tata: el('pTata').value, lebar: n('pLebar'), tinggi: n('pTinggi'), x: n('pX'), y: n('pY'), skala: Math.min(200, Math.max(50, n('pSkala') || 100)), suara: el('pSuara').checked };
+      return { tata: el('pTata').value, lebar: n('pLebar'), tinggi: n('pTinggi'), x: n('pX'), y: n('pY'), skala: Math.min(200, Math.max(50, n('pSkala') || 100)), suara: el('pSuara').checked, penuhOto: el('pPenuhOto').checked };
     }
-    ['pTata', 'pLebar', 'pTinggi', 'pX', 'pY', 'pSkala', 'pSuara'].forEach(function (id) {
+    ['pTata', 'pLebar', 'pTinggi', 'pX', 'pY', 'pSkala', 'pSuara', 'pPenuhOto'].forEach(function (id) {
       el(id).addEventListener('input', function () { el('pSkalaLb').textContent = el('pSkala').value + '%'; simpanLayar(bacaPanel()); });
       el(id).addEventListener('change', function () { simpanLayar(bacaPanel()); });
     });
@@ -381,7 +396,8 @@
       if (+a[1] > 0 && +a[1] <= 400) el('pTata').value = 'strip'; else if (+a[1] > +a[0]) el('pTata').value = 'tegak'; else if (+a[0] > 0) el('pTata').value = 'lebar';
       simpanLayar(bacaPanel());
     });
-    el('gear').addEventListener('click', function () { isiPanel(); el('panel').classList.add('buka'); });
+    function bukaPanel() { isiPanel(); el('panel').classList.add('buka'); bangun(); }
+    el('gear').addEventListener('click', bukaPanel);
     el('pTutup').addEventListener('click', function () { el('panel').classList.remove('buka'); bangun(); });
     el('pReset').addEventListener('click', function () { simpanLayar(Object.assign({}, SETEL_AWAL)); isiPanel(); });
     el('pPenuh').addEventListener('click', function () {
@@ -389,6 +405,36 @@
       if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {});
     });
     document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') el('panel').classList.remove('buka'); });
+
+    /* ---------- Layar penuh otomatis & tombol ⚙ tersembunyi (v6.9) ---------- */
+    // Tombol ⚙ hanya tampak bila kursor/sentuhan berada di dekat pojok kiri bawah.
+    function cekDekat(x, y) { document.body.classList.toggle('dekat-gear', x < 160 && y > window.innerHeight - 160); }
+    document.addEventListener('mousemove', function (ev) { cekDekat(ev.clientX, ev.clientY); });
+    document.addEventListener('touchstart', function (ev) { var t = ev.touches && ev.touches[0]; if (t) cekDekat(t.clientX, t.clientY); });
+    document.addEventListener('mouseleave', function () { document.body.classList.remove('dekat-gear'); });
+    function sudahPenuh() { return !!document.fullscreenElement || (window.innerWidth >= screen.width && window.innerHeight >= screen.height); }
+    function aturHint() { el('hintPenuh').classList.toggle('sembunyi-h', sudahPenuh() || layar().penuhOto === false || el('panel').classList.contains('buka')); }
+    function masukPenuh() {
+      var d = document.documentElement;
+      if (sudahPenuh() || !d.requestFullscreen) return;
+      d.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
+    }
+    // Browser mewajibkan gestur pengguna: klik/sentuh/tombol pertama di mana saja langsung membuat layar penuh.
+    document.addEventListener('pointerdown', function (ev) {
+      if (layar().penuhOto === false) return;
+      if (ev.target.closest && ev.target.closest('#panel, #gear')) return;
+      masukPenuh();
+    }, true);
+    document.addEventListener('keydown', function (ev) {
+      if (ev.target.closest && ev.target.closest('#panel')) return;
+      if ((ev.key === 's' || ev.key === 'S') && !ev.ctrlKey && !ev.metaKey && !ev.altKey) { ev.preventDefault(); if (el('panel').classList.contains('buka')) el('pTutup').click(); else bukaPanel(); aturHint(); return; }
+      if (ev.key === 'Escape' || /^F\d+$/.test(ev.key) || ev.ctrlKey || ev.metaKey || ev.altKey) return;
+      if (layar().penuhOto !== false) masukPenuh();
+    });
+    document.addEventListener('fullscreenchange', aturHint);
+    window.addEventListener('resize', aturHint);
+    document.addEventListener('mousemove', aturHint);
+    aturHint();
 
     terapkanLayar();
     tarik();

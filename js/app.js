@@ -1217,6 +1217,8 @@ function renderFoTable() {
             if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
             // v6.4: sudah diverifikasi (Proses/Pending/Selesai) → menu Detail
             if (!waiting && r.Status !== 'Terlewat' && r.LayananID) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${r.LayananID}')"><i class="bi bi-eye"></i> Detail</button>`;
+            // v6.9: layanan Selesai → panggil pemohon mengambil berkas di PTSP
+            if (st.label === 'Selesai' && r.LayananID) aksi += `<button class="btn btn-labuku-accent btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${r.LayananID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>`;
           }
           return `
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
@@ -1295,6 +1297,35 @@ function panggilFo(id) {
   umumkanPanggilan_(r); // v6.6: bel + suara dari speaker komputer
   if (r) kirimKeMonitor_({ tipe: 'panggil', row: { ID: r.ID, Nomor: r.Nomor, PemohonNama: r.PemohonNama, LayananNama: r.LayananNama } }); // v6.8
   foOptimistic(id, { Status: 'Di Loket' }, 'panggilAntrean', [id], r ? 'Nomor ' + r.Nomor + ' dipanggil ke loket.' : null);
+}
+
+/**
+ * v6.9: PANGGIL AMBIL BERKAS — layanan Selesai (Front Office / Back Office) dipanggil lagi ke meja PTSP.
+ * Optimistic: bel + suara + monitor seketika; server mencatat di latar belakang (agar monitor di komputer lain ikut).
+ */
+function infoAmbilBerkas_(layananId) {
+  const fo = (window.AppState.fo || []).filter(x => x.LayananID === layananId).pop();
+  const bo = (window.AppState.bo || []).find(x => x.ID === layananId);
+  const ws = window._wsData && window._wsData.layanan && window._wsData.layanan.ID === layananId ? window._wsData : null;
+  return {
+    Nomor: (fo && fo.Nomor) || (bo && bo.Nomor) || '',
+    PemohonNama: (fo && fo.PemohonNama) || (bo && bo.PemohonNama) || (ws && ws.layanan.PemohonNama) || '',
+    LayananNama: (fo && fo.LayananNama) || (bo && bo.JenisLayanan) || (ws && ws.layanan.JenisLayanan) || ''
+  };
+}
+function panggilAmbil(layananId) {
+  const r = infoAmbilBerkas_(layananId);
+  const kunci = 'AMB-' + String(layananId).replace(/[^\w.-]/g, '') + '-' + Date.now();
+  const umumkan = x => {
+    umumkanPanggilan_(x, null, 'ambil');
+    kirimKeMonitor_({ tipe: 'ambil', row: { ID: kunci, Nomor: x.Nomor, PemohonNama: x.PemohonNama, LayananNama: x.LayananNama } });
+  };
+  if (r.Nomor) umumkan(r); // nomor sudah diketahui → seketika
+  gsr(res => {
+    if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+    if (!r.Nomor) umumkan({ Nomor: res.data.nomor, PemohonNama: res.data.nama, LayananNama: res.data.layanan });
+    showToast('Berhasil', 'Panggilan ambil berkas' + ((r.Nomor || res.data.nomor) ? ' nomor ' + (r.Nomor || res.data.nomor) : '') + ' dikirim.', 'success');
+  }, err => showToast('Error', err.message || String(err), 'danger')).panggilAmbilBerkas(layananId, kunci);
 }
 
 function terlewatFo(id) {
@@ -1463,7 +1494,8 @@ function lewatiWaMassal() {
    Kalimat, tujuan, bel & jumlah ulang: semua perangkat (Pengaturan → Suara Panggilan, AppState.config.suara).
    Jenis suara, kecepatan, nada & volume: per perangkat (localStorage). */
 const ANGKA_UCAP = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
-const SUARA_BAWAAN = { suara_kalimat: 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.', suara_tujuan: 'loket', suara_bel: 'dingdong', suara_ulang: '1' };
+const SUARA_BAWAAN = { suara_kalimat: 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.', suara_tujuan: 'loket', suara_bel: 'dingdong', suara_ulang: '1',
+  suara_kalimat_ambil: 'Nomor antrean, {nomor}, atas nama {nama}, berkas {layanan} sudah selesai. Silakan ambil di {tujuan}.', suara_tujuan_ambil: 'meja PTSP' }; // v6.9: ambil berkas
 const BEL_INFO = [['dingdong', 'Ding-dong (2 nada)'], ['tiga', 'Pengumuman (3 nada naik)'], ['empat', 'Bandara (4 nada)'], ['ting', 'Ting (1 nada)'], ['tanpa', 'Tanpa bel']];
 const SUARA_PH = ['nomor', 'nama', 'layanan', 'tujuan', 'instansi'];
 function suaraAktif_() { return lsGet('labuku_suara') !== '0'; }
@@ -1475,16 +1507,17 @@ function suaraPerangkat_() {
 function ejaNomor_(nomor) {
   return String(nomor || '').split('').map(c => /\d/.test(c) ? ANGKA_UCAP[Number(c)] : (/[A-Za-z]/.test(c) ? c.toUpperCase() : '')).filter(Boolean).join(' ');
 }
-function kalimatPanggilan_(r, cfg) {
+function kalimatPanggilan_(r, cfg, jenis) {
   cfg = cfg || suaraCfg_();
+  const ambil = jenis === 'ambil'; // v6.9
   const vars = {
     nomor: ejaNomor_(r.Nomor),
     nama: String(r.PemohonNama || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
     layanan: String(r.LayananNama || ''),
-    tujuan: String(cfg.suara_tujuan || 'loket'),
+    tujuan: String((ambil ? cfg.suara_tujuan_ambil || SUARA_BAWAAN.suara_tujuan_ambil : cfg.suara_tujuan) || 'loket'),
     instansi: instansiNama()
   };
-  return String(cfg.suara_kalimat || SUARA_BAWAAN.suara_kalimat).replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m).replace(/\s+/g, ' ').trim();
+  return String((ambil ? cfg.suara_kalimat_ambil || SUARA_BAWAAN.suara_kalimat_ambil : cfg.suara_kalimat) || SUARA_BAWAAN.suara_kalimat).replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m).replace(/\s+/g, ' ').trim();
 }
 let _audioCtx = null;
 const POLA_BEL = {
@@ -1545,10 +1578,10 @@ function ucapkan_(teks, ulang) {
     return true;
   } catch (e) { return false; }
 }
-function umumkanPanggilan_(r, cfgUji) {
+function umumkanPanggilan_(r, cfgUji, jenis) {
   if (!r || (!cfgUji && !suaraAktif_())) return;
   const cfg = cfgUji || suaraCfg_();
-  const teks = kalimatPanggilan_(r, cfg);
+  const teks = kalimatPanggilan_(r, cfg, jenis);
   window._panggilanTerakhir = teks;
   bunyiBel_(cfg.suara_bel, suaraPerangkat_().vol, () => ucapkan_(teks, Number(cfg.suara_ulang) || 1));
 }
@@ -2258,6 +2291,7 @@ function renderBoTable() {
             <td class="kr-meta2">${l.ASNNama ? escapeHtml(l.ASNNama) : '<span class="text-secondary small">Belum diambil</span>'}</td>
             <td style="text-align:right;white-space:nowrap;">
               <button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${l.ID}')"><i class="bi bi-card-list"></i> Detail</button>
+              ${t.label === 'Selesai' ? `<button class="btn btn-labuku-accent btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${l.ID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>` : ''}
               <button class="btn ${t.label === 'Selesai' ? 'btn-labuku-outline' : 'btn-labuku-primary'} btn-sm-pill" onclick="openWorkspace('${l.ID}')">${t.label === 'Selesai' ? 'Buka' : 'Kerjakan'}</button></td>
           </tr>`;
         }).join('')}
@@ -2317,6 +2351,7 @@ function renderServiceWorkspace(res, layananId, initialTab) {
         <div class="small text-secondary">${escapeHtml(namaKapital(d.layanan.PemohonNama))}${d.pemohon && d.pemohon.NoHP ? ' · ' + escapeHtml(d.pemohon.NoHP) : ''}</div>
       </div>
       <div class="d-flex align-items-center gap-2 flex-wrap">
+        <span id="wsAmbilSlot"></span>
         <button class="btn btn-labuku-accent btn-petunjuk" id="wsPetunjukBtn" onclick="bukaPetunjuk()"><i class="bi bi-journal-text"></i> Petunjuk Teknis</button>
         <span class="badge-status badge-model">${escapeHtml(MODEL_LABEL[model])}</span>
         <span class="badge-status ${(BO_TAHAP[tahap] || BO_TAHAP.Isian).cls}">${tahap}</span>
@@ -2345,6 +2380,9 @@ function renderWorkspaceTab(tab) {
   if (tab === 'tte' && d.model === 'TTE') target.innerHTML = buildWorkspaceTteTab(d);
   else if (tab === 'selesai' || d.model === 'Langsung') target.innerHTML = buildWorkspaceSelesaiTab(d);
   else target.innerHTML = buildWorkspaceIsianTab(d);
+  // v6.9: layanan Selesai → tombol panggil ambil berkas di kepala workspace (tampil di semua tab)
+  const slot = document.getElementById('wsAmbilSlot');
+  if (slot) slot.innerHTML = d.layanan.Status === 'Selesai' ? `<button class="btn btn-labuku-primary btn-ambil" onclick="panggilAmbil('${escapeHtml(d.layanan.ID)}')"><i class="bi bi-megaphone"></i> Panggil Ambil Berkas</button>` : '';
 }
 
 /* ---------- v6.2: Petunjuk Teknis (teks per layanan) di panel samping ---------- */
@@ -3657,8 +3695,23 @@ function loadManajemenSuara() {
       </div>
       <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
       <div class="wa-preview" id="suaraPratinjau"></div>
+      <hr class="my-4">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div><h6 class="fw-bold mb-1">Kalimat panggilan ambil berkas</h6><div class="small text-secondary mb-2">Diucapkan setelah bel saat petugas menekan <b>Panggil Ambil</b> pada layanan yang sudah <b>Selesai</b> (Front Office / Back Office).</div></div>
+        <button class="btn btn-link btn-sm p-0" onclick="resetSuaraKalimat('ambil')">Kembalikan bawaan</button>
+      </div>
+      <div class="mb-2">${SUARA_PH.map(x => `<span class="wa-ph" onclick="sisipSuaraPh('${x}', 'suaraKalimatAmbil')">{${x}}</span>`).join('')}</div>
+      <textarea class="form-control" rows="3" maxlength="300" id="suaraKalimatAmbil" oninput="pratinjauSuara()">${escapeHtml(c.suara_kalimat_ambil)}</textarea>
+      <div class="row g-3 mt-1">
+        <div class="col-md-6"><label class="form-label" for="suaraTujuanAmbil">Tempat ambil ({tujuan})</label>
+          <input class="form-control" id="suaraTujuanAmbil" maxlength="60" value="${escapeHtml(c.suara_tujuan_ambil)}" oninput="pratinjauSuara()">
+          <div class="mt-1">${['meja PTSP', 'loket', 'meja PTSP satu', 'ruang pelayanan'].map(t => `<span class="wa-ph" onclick="document.getElementById('suaraTujuanAmbil').value='${t}';pratinjauSuara()">${t}</span>`).join('')}</div></div>
+      </div>
+      <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
+      <div class="wa-preview" id="suaraPratinjauAmbil"></div>
       <div class="d-flex gap-2 flex-wrap mt-3">
         <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan()"><i class="bi bi-volume-up"></i> Coba suara</button>
+        <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan('ambil')"><i class="bi bi-megaphone"></i> Coba ambil berkas</button>
         <button class="btn btn-labuku-primary" id="suaraSimpanBtn" onclick="simpanSuara()"><i class="bi bi-save"></i> Simpan</button>
       </div>
       <div class="small text-secondary mt-2">Jenis suara, kecepatan, nada & volume diatur di tiap komputer: Front Office → ikon pengatur.</div>
@@ -3670,15 +3723,19 @@ function bacaFormSuara_() {
     suara_kalimat: document.getElementById('suaraKalimat').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim(),
     suara_tujuan: document.getElementById('suaraTujuan').value.replace(/\s+/g, ' ').trim(),
     suara_bel: document.getElementById('suaraBel').value,
-    suara_ulang: document.getElementById('suaraUlang').value
+    suara_ulang: document.getElementById('suaraUlang').value,
+    suara_kalimat_ambil: document.getElementById('suaraKalimatAmbil').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim(),
+    suara_tujuan_ambil: document.getElementById('suaraTujuanAmbil').value.replace(/\s+/g, ' ').trim()
   };
 }
 function pratinjauSuara() {
   const el = document.getElementById('suaraPratinjau');
   if (el) el.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
+  const elA = document.getElementById('suaraPratinjauAmbil');
+  if (elA) elA.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()), 'ambil');
 }
-function sisipSuaraPh(ph) {
-  const ta = document.getElementById('suaraKalimat');
+function sisipSuaraPh(ph, targetId) {
+  const ta = document.getElementById(targetId || 'suaraKalimat');
   if (!ta) return;
   const teks = '{' + ph + '}';
   const a = ta.selectionStart || ta.value.length, b = ta.selectionEnd || a;
@@ -3686,15 +3743,18 @@ function sisipSuaraPh(ph) {
   ta.focus(); ta.selectionStart = ta.selectionEnd = a + teks.length;
   pratinjauSuara();
 }
-function resetSuaraKalimat() {
-  document.getElementById('suaraKalimat').value = SUARA_BAWAAN.suara_kalimat;
+function resetSuaraKalimat(jenis) {
+  if (jenis === 'ambil') document.getElementById('suaraKalimatAmbil').value = SUARA_BAWAAN.suara_kalimat_ambil;
+  else document.getElementById('suaraKalimat').value = SUARA_BAWAAN.suara_kalimat;
   pratinjauSuara();
 }
-function cobaSuaraPengaturan() { umumkanPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_())); }
+function cobaSuaraPengaturan(jenis) { umumkanPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()), jenis); }
 function simpanSuara() {
   const obj = bacaFormSuara_();
   if (!obj.suara_kalimat) { showToast('Peringatan', 'Kalimat panggilan tidak boleh kosong.', 'warning'); return; }
   if (!obj.suara_tujuan) obj.suara_tujuan = SUARA_BAWAAN.suara_tujuan;
+  if (!obj.suara_kalimat_ambil) obj.suara_kalimat_ambil = SUARA_BAWAAN.suara_kalimat_ambil; // v6.9
+  if (!obj.suara_tujuan_ambil) obj.suara_tujuan_ambil = SUARA_BAWAAN.suara_tujuan_ambil;
   const btn = document.getElementById('suaraSimpanBtn');
   btn.disabled = true;
   gsr(res => {
