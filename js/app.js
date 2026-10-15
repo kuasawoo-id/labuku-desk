@@ -1432,71 +1432,139 @@ function lewatiWaMassal() {
   renderWaMassal_();
 }
 
-/* ══ v6.6: panggilan suara (bel + text-to-speech) & pengaturan perangkat ini ══ */
+/* ══ v6.6/v6.7: panggilan suara (bel + text-to-speech) ══
+   Kalimat, tujuan, bel & jumlah ulang: semua perangkat (Pengaturan → Suara Panggilan, AppState.config.suara).
+   Jenis suara, kecepatan, nada & volume: per perangkat (localStorage). */
 const ANGKA_UCAP = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
+const SUARA_BAWAAN = { suara_kalimat: 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.', suara_tujuan: 'loket', suara_bel: 'dingdong', suara_ulang: '1' };
+const BEL_INFO = [['dingdong', 'Ding-dong (2 nada)'], ['tiga', 'Pengumuman (3 nada naik)'], ['empat', 'Bandara (4 nada)'], ['ting', 'Ting (1 nada)'], ['tanpa', 'Tanpa bel']];
+const SUARA_PH = ['nomor', 'nama', 'layanan', 'tujuan', 'instansi'];
 function suaraAktif_() { return lsGet('labuku_suara') !== '0'; }
-function kalimatPanggilan_(r) {
-  const nomor = String(r.Nomor || '').split('').map(c => /\d/.test(c) ? ANGKA_UCAP[Number(c)] : (/[A-Za-z]/.test(c) ? c.toUpperCase() : '')).filter(Boolean).join(' ');
-  const nama = String(r.PemohonNama || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase());
-  return 'Nomor antrean, ' + nomor + ', atas nama ' + nama + ', silakan menuju loket.';
+function suaraCfg_() { return Object.assign({}, SUARA_BAWAAN, (window.AppState.config && window.AppState.config.suara) || {}); }
+function suaraPerangkat_() {
+  const n = (k, d, min, max) => { const v = parseFloat(lsGet(k)); return isNaN(v) ? d : Math.min(max, Math.max(min, v)); };
+  return { voice: lsGet('labuku_suara_voice') || '', rate: n('labuku_suara_rate', 0.9, 0.5, 1.5), pitch: n('labuku_suara_pitch', 1, 0.5, 1.5), vol: n('labuku_suara_vol', 1, 0, 1) };
+}
+function ejaNomor_(nomor) {
+  return String(nomor || '').split('').map(c => /\d/.test(c) ? ANGKA_UCAP[Number(c)] : (/[A-Za-z]/.test(c) ? c.toUpperCase() : '')).filter(Boolean).join(' ');
+}
+function kalimatPanggilan_(r, cfg) {
+  cfg = cfg || suaraCfg_();
+  const vars = {
+    nomor: ejaNomor_(r.Nomor),
+    nama: String(r.PemohonNama || '').toLowerCase().replace(/\b\w/g, c => c.toUpperCase()),
+    layanan: String(r.LayananNama || ''),
+    tujuan: String(cfg.suara_tujuan || 'loket'),
+    instansi: instansiNama()
+  };
+  return String(cfg.suara_kalimat || SUARA_BAWAAN.suara_kalimat).replace(/\{(\w+)\}/g, (m, k) => vars[k] !== undefined ? vars[k] : m).replace(/\s+/g, ' ').trim();
 }
 let _audioCtx = null;
-function bunyiBel_(lalu) {
+const POLA_BEL = {
+  dingdong: [[659.25, 0, 0.6], [523.25, 0.45, 0.7]],
+  tiga: [[523.25, 0, 0.45], [659.25, 0.3, 0.45], [783.99, 0.6, 0.8]],
+  empat: [[392, 0, 0.45], [523.25, 0.3, 0.45], [659.25, 0.6, 0.45], [783.99, 0.9, 0.9]],
+  ting: [[1318.5, 0, 1.0], [2637, 0, 0.5]],
+  tanpa: []
+};
+function bunyiBel_(jenis, vol, lalu) {
+  const pola = POLA_BEL[jenis] || POLA_BEL.dingdong;
+  if (!pola.length) { lalu(); return; }
   try {
     const AC = window.AudioContext || window.webkitAudioContext;
     if (!AC) { lalu(); return; }
     _audioCtx = _audioCtx || new AC();
     if (_audioCtx.state === 'suspended') _audioCtx.resume();
     const t0 = _audioCtx.currentTime + 0.02;
-    [[659.25, 0], [523.25, 0.45]].forEach(([f, d]) => {
+    const puncak = Math.max(0.0002, 0.35 * (vol == null ? 1 : vol));
+    let akhir = 0;
+    pola.forEach(([f, d, dur]) => {
       const o = _audioCtx.createOscillator(), g = _audioCtx.createGain();
       o.type = 'sine'; o.frequency.value = f;
       g.gain.setValueAtTime(0.0001, t0 + d);
-      g.gain.exponentialRampToValueAtTime(0.35, t0 + d + 0.02);
-      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.6);
+      g.gain.exponentialRampToValueAtTime(puncak, t0 + d + 0.02);
+      g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + dur);
       o.connect(g); g.connect(_audioCtx.destination);
-      o.start(t0 + d); o.stop(t0 + d + 0.65);
+      o.start(t0 + d); o.stop(t0 + d + dur + 0.05);
+      akhir = Math.max(akhir, d + dur);
     });
-    setTimeout(lalu, 1150);
+    setTimeout(lalu, Math.round(akhir * 1000) + 250);
   } catch (e) { lalu(); }
 }
-function suaraIndonesia_() {
-  if (!window.speechSynthesis) return null;
-  const v = window.speechSynthesis.getVoices().filter(x => /^id([-_]|$)/i.test(x.lang));
-  return v.find(x => /google/i.test(x.name)) || v.find(x => /natural|online/i.test(x.name)) || v[0] || null;
+function daftarSuara_() {
+  if (!window.speechSynthesis) return [];
+  const semua = window.speechSynthesis.getVoices() || [];
+  const id = semua.filter(x => /^id([-_]|$)/i.test(x.lang));
+  return id.concat(semua.filter(x => id.indexOf(x) < 0));
 }
-function ucapkan_(teks) {
+function pilihSuara_() {
+  const semua = daftarSuara_();
+  const simpan = suaraPerangkat_().voice;
+  if (simpan) { const v = semua.find(x => x.voiceURI === simpan || x.name === simpan); if (v) return v; }
+  const id = semua.filter(x => /^id([-_]|$)/i.test(x.lang));
+  return id.find(x => /google/i.test(x.name)) || id.find(x => /natural|online/i.test(x.name)) || id[0] || null;
+}
+function ucapkan_(teks, ulang) {
   if (!window.speechSynthesis || typeof SpeechSynthesisUtterance === 'undefined') return false;
   try {
+    const p = suaraPerangkat_(), v = pilihSuara_();
     window.speechSynthesis.cancel();
-    const u = new SpeechSynthesisUtterance(teks);
-    u.lang = 'id-ID'; u.rate = 0.9; u.pitch = 1; u.volume = 1;
-    const v = suaraIndonesia_(); if (v) u.voice = v;
-    window.speechSynthesis.speak(u);
+    for (let i = 0; i < Math.max(1, Math.min(3, ulang || 1)); i++) {
+      const u = new SpeechSynthesisUtterance(teks);
+      u.lang = v ? v.lang : 'id-ID'; u.rate = p.rate; u.pitch = p.pitch; u.volume = p.vol;
+      if (v) u.voice = v;
+      window.speechSynthesis.speak(u); // antre: diucapkan berurutan
+    }
     return true;
   } catch (e) { return false; }
 }
-function umumkanPanggilan_(r) {
-  if (!r || !suaraAktif_()) return;
-  const teks = kalimatPanggilan_(r);
+function umumkanPanggilan_(r, cfgUji) {
+  if (!r || (!cfgUji && !suaraAktif_())) return;
+  const cfg = cfgUji || suaraCfg_();
+  const teks = kalimatPanggilan_(r, cfg);
   window._panggilanTerakhir = teks;
-  bunyiBel_(() => ucapkan_(teks));
+  bunyiBel_(cfg.suara_bel, suaraPerangkat_().vol, () => ucapkan_(teks, Number(cfg.suara_ulang) || 1));
 }
-document.addEventListener('DOMContentLoaded', () => { try { if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => window.speechSynthesis.getVoices(); } } catch (e) {} });
+document.addEventListener('DOMContentLoaded', () => { try { if (window.speechSynthesis) { window.speechSynthesis.getVoices(); window.speechSynthesis.onvoiceschanged = () => { window.speechSynthesis.getVoices(); isiPilihanSuara_(); }; } } catch (e) {} });
+const CONTOH_PANGGIL = { Nomor: 'A-001', PemohonNama: 'Contoh Nama Pemohon', LayananNama: 'Pendaftaran Kehendak Nikah' };
+
+/* Daftar suara di pengaturan perangkat (diisi ulang saat browser selesai memuat daftar suara). */
+function isiPilihanSuara_() {
+  const sel = document.getElementById('setSuaraVoice');
+  if (!sel) return;
+  const semua = daftarSuara_(), aktif = pilihSuara_();
+  sel.innerHTML = '<option value="">Otomatis (bahasa Indonesia)</option>' + semua.map(v => `<option value="${escapeHtml(v.voiceURI || v.name)}" ${aktif && lsGet('labuku_suara_voice') && (v.voiceURI || v.name) === (aktif.voiceURI || aktif.name) ? 'selected' : ''}>${escapeHtml(v.name)} — ${escapeHtml(v.lang)}</option>`).join('');
+  const info = document.getElementById('setSuaraInfo');
+  if (info) info.textContent = semua.length ? (aktif ? 'Dipakai: ' + aktif.name : 'Suara bahasa Indonesia tidak ditemukan — pilih suara lain atau gunakan Chrome/Edge terbaru.') : 'Browser ini belum menyediakan daftar suara.';
+}
+function aturSuaraPerangkat_(kunci, nilai, labelId, satuan) {
+  lsSet(kunci, String(nilai));
+  const lb = document.getElementById(labelId);
+  if (lb) lb.textContent = (satuan === '%' ? Math.round(Number(nilai) * 100) + '%' : Number(nilai).toFixed(1) + '×');
+}
 
 function waDesktopAktif_() { return lsGet('labuku_wa_desktop') === '1' && !/Android|iPhone|iPad|iPod|Mobile/i.test(navigator.userAgent); }
 function bukaPengaturanPerangkat() {
   tutupLainnya();
-  const v = suaraIndonesia_();
+  const p = suaraPerangkat_();
   openFormModal('Pengaturan Perangkat Ini', `
     <p class="small text-secondary">Berlaku hanya di perangkat/browser ini.</p>
     <div class="lb-card mb-3">
       <div class="form-check form-switch mb-1">
         <input class="form-check-input" type="checkbox" id="setSuara" ${suaraAktif_() ? 'checked' : ''} onchange="lsSet('labuku_suara', this.checked ? '1' : '0')">
-        <label class="form-check-label fw-semibold" for="setSuara">Suara panggilan (bel + nomor + nama)</label>
+        <label class="form-check-label fw-semibold" for="setSuara">Suara panggilan di perangkat ini</label>
       </div>
-      <div class="small text-secondary mb-2">Saat <b>Panggil</b> ditekan, speaker komputer membunyikan bel lalu menyebut nomor antrean & nama. Suara: ${v ? escapeHtml(v.name) : 'bawaan browser (bahasa Indonesia tidak ditemukan — gunakan Chrome/Edge terbaru)'}.</div>
-      <button class="btn btn-labuku-outline btn-sm" onclick="umumkanPanggilan_({ Nomor: 'A-001', PemohonNama: 'Contoh Nama Pemohon' })"><i class="bi bi-volume-up"></i> Coba suara</button>
+      <div class="small text-secondary mb-2">Saat <b>Panggil</b> ditekan, speaker membunyikan bel lalu mengucapkan kalimat panggilan.</div>
+      <label class="form-label small mb-1" for="setSuaraVoice">Jenis suara</label>
+      <select class="form-select mb-1" id="setSuaraVoice" onchange="lsSet('labuku_suara_voice', this.value); isiPilihanSuara_()"></select>
+      <div class="small text-secondary mb-2" id="setSuaraInfo"></div>
+      <div class="row g-2 mb-2">
+        <div class="col-4"><label class="form-label small mb-0">Kecepatan <b id="lbRate">${p.rate.toFixed(1)}×</b></label><input type="range" class="form-range" id="setSuaraRate" min="0.5" max="1.5" step="0.1" value="${p.rate}" oninput="aturSuaraPerangkat_('labuku_suara_rate', this.value, 'lbRate')"></div>
+        <div class="col-4"><label class="form-label small mb-0">Nada <b id="lbPitch">${p.pitch.toFixed(1)}×</b></label><input type="range" class="form-range" id="setSuaraPitch" min="0.5" max="1.5" step="0.1" value="${p.pitch}" oninput="aturSuaraPerangkat_('labuku_suara_pitch', this.value, 'lbPitch')"></div>
+        <div class="col-4"><label class="form-label small mb-0">Volume <b id="lbVol">${Math.round(p.vol * 100)}%</b></label><input type="range" class="form-range" id="setSuaraVol" min="0" max="1" step="0.1" value="${p.vol}" oninput="aturSuaraPerangkat_('labuku_suara_vol', this.value, 'lbVol', '%')"></div>
+      </div>
+      <div class="small text-secondary mb-2">Kalimat, tujuan (loket/meja PTSP), bel & jumlah ulang: <b>${escapeHtml(BEL_INFO.find(b => b[0] === suaraCfg_().suara_bel)[1])}</b>, ${escapeHtml(suaraCfg_().suara_ulang)}× — diatur Kepala KUA di <b>Pengaturan → Suara Panggilan</b>.</div>
+      <button class="btn btn-labuku-outline btn-sm" onclick="umumkanPanggilan_(CONTOH_PANGGIL, suaraCfg_())"><i class="bi bi-volume-up"></i> Coba suara</button>
     </div>
     <div class="lb-card">
       <div class="form-check form-switch mb-1">
@@ -1505,6 +1573,7 @@ function bukaPengaturanPerangkat() {
       </div>
       <div class="small text-secondary">Khusus komputer yang sudah terpasang & masuk WhatsApp Desktop. Tombol WA langsung membuka aplikasinya, tidak lewat WA Web. Di HP selalu memakai aplikasi WhatsApp.</div>
     </div>`);
+  isiPilihanSuara_();
 }
 
 /* ---------- Pilihan layanan: bisa diketik, yang paling sering dipakai di atas ---------- */
@@ -3231,7 +3300,7 @@ function renderManajemenShell() {
     <h2 class="page-heading">Pengaturan</h2>
 
     <div class="d-flex flex-wrap gap-2 mb-3" id="manajemenTabNav">
-      ${[['users', 'Tim / ASN'], ['wa', 'Template WA'], ['pengaturan', 'Umum'], ['keamanan', 'Keamanan']].map(([k, label]) => `
+      ${[['users', 'Tim / ASN'], ['wa', 'Template WA'], ['suara', 'Suara Panggilan'], ['pengaturan', 'Umum'], ['keamanan', 'Keamanan']].map(([k, label]) => `
         <button class="btn ${k === 'users' ? 'btn-labuku-primary' : 'btn-labuku-outline'} btn-sm-pill" data-mtab="${k}" onclick="switchManajemenTab('${k}')">${label}</button>
       `).join('')}
     </div>
@@ -3248,6 +3317,7 @@ function switchManajemenTab(tab) {
   });
   if (tab === 'users') loadManajemenUsers();
   else if (tab === 'wa') loadManajemenWa();
+  else if (tab === 'suara') loadManajemenSuara();
   else if (tab === 'keamanan') loadManajemenKeamanan();
   else if (tab === 'pengaturan') loadManajemenPengaturan();
 }
@@ -3485,6 +3555,80 @@ function simpanWaTpl() {
       window.AppState.config.wa = wa;
       saveAppStateCache();
       showToast('Berhasil', 'Template WA disimpan.', 'success');
+    } else showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
+  }, err => { btn.disabled = false; showToast('Error', err.message || err, 'danger'); }).saveSettings(obj);
+}
+
+/* ---------- v6.7 Tab: Suara Panggilan (berlaku untuk semua perangkat) ---------- */
+function loadManajemenSuara() {
+  const box = document.getElementById('manajemenContentBox');
+  const c = suaraCfg_();
+  box.innerHTML = `
+    <div class="lb-card mb-3 wa-tpl" style="max-width:820px;">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div><h6 class="fw-bold mb-1">Kalimat panggilan</h6><div class="small text-secondary mb-2">Diucapkan setelah bel saat petugas menekan <b>Panggil</b>. Klik penanda untuk menyisipkan. {nomor} dieja per angka, mis. "A nol nol lima".</div></div>
+        <button class="btn btn-link btn-sm p-0" onclick="resetSuaraKalimat()">Kembalikan bawaan</button>
+      </div>
+      <div class="mb-2">${SUARA_PH.map(x => `<span class="wa-ph" onclick="sisipSuaraPh('${x}')">{${x}}</span>`).join('')}</div>
+      <textarea class="form-control" rows="3" maxlength="300" id="suaraKalimat" oninput="pratinjauSuara()">${escapeHtml(c.suara_kalimat)}</textarea>
+      <div class="row g-3 mt-1">
+        <div class="col-md-6"><label class="form-label" for="suaraTujuan">Tujuan ({tujuan})</label>
+          <input class="form-control" id="suaraTujuan" maxlength="60" value="${escapeHtml(c.suara_tujuan)}" oninput="pratinjauSuara()">
+          <div class="mt-1">${['loket', 'meja PTSP', 'meja PTSP satu', 'ruang pelayanan'].map(t => `<span class="wa-ph" onclick="document.getElementById('suaraTujuan').value='${t}';pratinjauSuara()">${t}</span>`).join('')}</div></div>
+        <div class="col-6 col-md-3"><label class="form-label" for="suaraBel">Bel</label>
+          <select class="form-select" id="suaraBel">${BEL_INFO.map(([k, l]) => `<option value="${k}" ${k === c.suara_bel ? 'selected' : ''}>${l}</option>`).join('')}</select>
+          <button class="btn btn-link btn-sm p-0 mt-1" onclick="bunyiBel_(document.getElementById('suaraBel').value, suaraPerangkat_().vol, function () {})"><i class="bi bi-play-circle"></i> Dengar bel</button></div>
+        <div class="col-6 col-md-3"><label class="form-label" for="suaraUlang">Diucapkan</label>
+          <select class="form-select" id="suaraUlang">${[1, 2, 3].map(n => `<option value="${n}" ${String(n) === String(c.suara_ulang) ? 'selected' : ''}>${n} kali</option>`).join('')}</select></div>
+      </div>
+      <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
+      <div class="wa-preview" id="suaraPratinjau"></div>
+      <div class="d-flex gap-2 flex-wrap mt-3">
+        <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan()"><i class="bi bi-volume-up"></i> Coba suara</button>
+        <button class="btn btn-labuku-primary" id="suaraSimpanBtn" onclick="simpanSuara()"><i class="bi bi-save"></i> Simpan</button>
+      </div>
+      <div class="small text-secondary mt-2">Jenis suara, kecepatan, nada & volume diatur di tiap komputer: Front Office → ikon pengatur.</div>
+    </div>`;
+  pratinjauSuara();
+}
+function bacaFormSuara_() {
+  return {
+    suara_kalimat: document.getElementById('suaraKalimat').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim(),
+    suara_tujuan: document.getElementById('suaraTujuan').value.replace(/\s+/g, ' ').trim(),
+    suara_bel: document.getElementById('suaraBel').value,
+    suara_ulang: document.getElementById('suaraUlang').value
+  };
+}
+function pratinjauSuara() {
+  const el = document.getElementById('suaraPratinjau');
+  if (el) el.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
+}
+function sisipSuaraPh(ph) {
+  const ta = document.getElementById('suaraKalimat');
+  if (!ta) return;
+  const teks = '{' + ph + '}';
+  const a = ta.selectionStart || ta.value.length, b = ta.selectionEnd || a;
+  ta.value = ta.value.slice(0, a) + teks + ta.value.slice(b);
+  ta.focus(); ta.selectionStart = ta.selectionEnd = a + teks.length;
+  pratinjauSuara();
+}
+function resetSuaraKalimat() {
+  document.getElementById('suaraKalimat').value = SUARA_BAWAAN.suara_kalimat;
+  pratinjauSuara();
+}
+function cobaSuaraPengaturan() { umumkanPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_())); }
+function simpanSuara() {
+  const obj = bacaFormSuara_();
+  if (!obj.suara_kalimat) { showToast('Peringatan', 'Kalimat panggilan tidak boleh kosong.', 'warning'); return; }
+  if (!obj.suara_tujuan) obj.suara_tujuan = SUARA_BAWAAN.suara_tujuan;
+  const btn = document.getElementById('suaraSimpanBtn');
+  btn.disabled = true;
+  gsr(res => {
+    btn.disabled = false;
+    if (res && res.success) {
+      window.AppState.config.suara = Object.assign({}, suaraCfg_(), obj);
+      saveAppStateCache();
+      showToast('Berhasil', 'Suara panggilan disimpan untuk semua perangkat.', 'success');
     } else showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
   }, err => { btn.disabled = false; showToast('Error', err.message || err, 'danger'); }).saveSettings(obj);
 }
