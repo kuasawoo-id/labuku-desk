@@ -1233,7 +1233,33 @@ function renderFoTable() {
     </table>`;
 }
 
-function saveFoToCache() { if (foFilter.periode === 'today') saveAppStateCache(); }
+function saveFoToCache() { if (foFilter.periode === 'today') saveAppStateCache(); kirimKeMonitor_({ tipe: 'segarkan' }); }
+
+/* v6.8: kabari layar Monitor Antrean di browser yang sama (tab/jendela lain) — tampil seketika tanpa menunggu server. */
+let _kanalMonitor = null;
+function kirimKeMonitor_(pesan) {
+  try {
+    if (typeof BroadcastChannel === 'undefined') return;
+    _kanalMonitor = _kanalMonitor || new BroadcastChannel('labuku_monitor');
+    _kanalMonitor.postMessage(pesan);
+  } catch (e) {}
+}
+
+/* v6.8: buka layar monitor; bila browser mendukung (Chrome/Edge), langsung ditaruh di monitor kedua. */
+async function bukaMonitor() {
+  const url = new URL('monitor.html', location.href).href;
+  let fitur = 'width=1280,height=720';
+  try {
+    if ('getScreenDetails' in window) {
+      const sd = await window.getScreenDetails();
+      const lain = (sd.screens || []).find(x => x !== sd.currentScreen);
+      if (lain) fitur = 'left=' + lain.availLeft + ',top=' + lain.availTop + ',width=' + lain.availWidth + ',height=' + lain.availHeight;
+    }
+  } catch (e) {}
+  const w = window.open(url, 'labuku_monitor', fitur);
+  if (!w) { showToast('Info', 'Jendela diblokir browser. Izinkan pop-up untuk situs ini, atau buka: ' + url, 'warning'); return; }
+  showToast('Monitor', fitur.indexOf('left=') === 0 ? 'Monitor dibuka di layar kedua. Klik ⚙ di monitor → Layar penuh.' : 'Seret jendela Monitor ke layar kedua, lalu klik ⚙ → Layar penuh.', 'info');
+}
 
 function refreshFrontOffice(silent, done) {
   const range = rangeFor(foFilter.periode, foFilter.dari, foFilter.sampai);
@@ -1267,6 +1293,7 @@ function foOptimistic(id, patch, serverFn, args, okMsg) {
 function panggilFo(id) {
   const r = window.AppState.fo.find(x => x.ID === id);
   umumkanPanggilan_(r); // v6.6: bel + suara dari speaker komputer
+  if (r) kirimKeMonitor_({ tipe: 'panggil', row: { ID: r.ID, Nomor: r.Nomor, PemohonNama: r.PemohonNama, LayananNama: r.LayananNama } }); // v6.8
   foOptimistic(id, { Status: 'Di Loket' }, 'panggilAntrean', [id], r ? 'Nomor ' + r.Nomor + ' dipanggil ke loket.' : null);
 }
 
@@ -1549,6 +1576,11 @@ function bukaPengaturanPerangkat() {
   const p = suaraPerangkat_();
   openFormModal('Pengaturan Perangkat Ini', `
     <p class="small text-secondary">Berlaku hanya di perangkat/browser ini.</p>
+    <div class="lb-card mb-3 d-flex align-items-center gap-3 flex-wrap">
+      <div class="flex-grow-1"><div class="fw-semibold"><i class="bi bi-display"></i> Layar Monitor Antrean</div>
+        <div class="small text-secondary">Untuk monitor kedua / TV ruang tunggu: nomor dipanggil, berikutnya, QR & teks berjalan.</div></div>
+      <button class="btn btn-labuku-primary" onclick="bukaMonitor()"><i class="bi bi-box-arrow-up-right"></i> Buka Monitor</button>
+    </div>
     <div class="lb-card mb-3">
       <div class="form-check form-switch mb-1">
         <input class="form-check-input" type="checkbox" id="setSuara" ${suaraAktif_() ? 'checked' : ''} onchange="lsSet('labuku_suara', this.checked ? '1' : '0')">
@@ -1880,21 +1912,62 @@ function salinLinkPublik() {
   } else { input.select(); document.execCommand('copy'); done(); }
 }
 
+/* v6.8: QR siap cetak bermerek — LABUKU Desk + nama KUA, QR resolusi tinggi (dibuat ulang 640 px, bukan diperbesar). */
 function unduhQr(instansi) {
-  const src = document.querySelector('#qrBox canvas');
-  if (!src) { showToast('Info', 'QR belum siap.', 'warning'); return; }
+  const url = window.AppState.publicFormUrl;
+  if (!url || typeof QRCode === 'undefined') { showToast('Info', 'QR belum siap.', 'warning'); return; }
+  const tmp = document.createElement('div');
+  tmp.style.cssText = 'position:fixed;left:-9999px;top:0;';
+  document.body.appendChild(tmp);
+  new QRCode(tmp, { text: url, width: 640, height: 640, correctLevel: QRCode.CorrectLevel.M });
+  const src = tmp.querySelector('canvas');
+  const W = 1200, H = 1700, HIJAU = '#1B4332', EMAS = '#D4A017';
   const c = document.createElement('canvas');
-  c.width = 600; c.height = 720;
+  c.width = W; c.height = H;
   const g = c.getContext('2d');
-  g.fillStyle = '#ffffff'; g.fillRect(0, 0, c.width, c.height);
-  g.fillStyle = '#1B4332'; g.textAlign = 'center';
-  g.font = 'bold 34px Inter, Arial, sans-serif'; g.fillText('AMBIL NOMOR ANTREAN', 300, 70);
-  g.font = '24px Inter, Arial, sans-serif'; g.fillText(instansi, 300, 110);
+  const font = (w, px) => w + ' ' + px + 'px Inter, "Segoe UI", Arial, sans-serif';
+  const bungkus = (teks, maks, px, berat) => { // pecah baris agar nama KUA panjang tidak terpotong
+    g.font = font(berat, px);
+    const kata = String(teks).split(' '), baris = [];
+    let cur = '';
+    kata.forEach(k => { const coba = cur ? cur + ' ' + k : k; if (g.measureText(coba).width > maks && cur) { baris.push(cur); cur = k; } else cur = coba; });
+    if (cur) baris.push(cur);
+    return baris;
+  };
+  // latar & pita merek
+  g.fillStyle = '#ffffff'; g.fillRect(0, 0, W, H);
+  g.fillStyle = HIJAU; g.fillRect(0, 0, W, 300);
+  g.fillStyle = EMAS; g.fillRect(0, 300, W, 12);
+  g.textAlign = 'center';
+  g.fillStyle = '#ffffff'; g.font = font('800', 92); g.fillText('LABUKU DESK', W / 2, 140);
+  g.fillStyle = '#d9eee2'; g.font = font('500', 34); g.fillText('Layanan Administrasi dan Pembukuan KUA', W / 2, 200);
+  g.fillStyle = EMAS; g.font = font('600', 26); g.fillText('by Ahzani Labs', W / 2, 250);
+  // nama KUA
+  let y = 410;
+  g.fillStyle = HIJAU;
+  bungkus(instansi, W - 160, 64, '800').forEach(b => { g.font = font('800', 64); g.fillText(b, W / 2, y); y += 76; });
+  // judul ajakan
+  y += 14;
+  g.fillStyle = '#ffffff';
+  const lbr = 760; g.fillStyle = EMAS;
+  g.beginPath(); if (g.roundRect) g.roundRect((W - lbr) / 2, y - 58, lbr, 84, 42); else g.rect((W - lbr) / 2, y - 58, lbr, 84); g.fill();
+  g.fillStyle = HIJAU; g.font = font('800', 46); g.fillText('AMBIL NOMOR ANTREAN', W / 2, y);
+  // QR dalam bingkai
+  const q = 640, qx = (W - q) / 2, qy = y + 70;
+  g.fillStyle = HIJAU; g.beginPath(); if (g.roundRect) g.roundRect(qx - 36, qy - 36, q + 72, q + 72, 36); else g.rect(qx - 36, qy - 36, q + 72, q + 72); g.fill();
+  g.fillStyle = '#ffffff'; g.fillRect(qx - 16, qy - 16, q + 32, q + 32);
   g.imageSmoothingEnabled = false;
-  g.drawImage(src, 100, 140, 400, 400);
-  g.fillStyle = '#475569'; g.font = '22px Inter, Arial, sans-serif';
-  g.fillText('Scan dengan kamera HP, isi data,', 300, 600);
-  g.fillText('lalu tunggu panggilan di ruang tunggu.', 300, 634);
+  if (src) g.drawImage(src, qx, qy, q, q);
+  // langkah
+  y = qy + q + 120;
+  g.fillStyle = '#10291f'; g.font = font('700', 40); g.fillText('Scan dengan kamera HP', W / 2, y);
+  g.fillStyle = '#475569'; g.font = font('500', 32);
+  g.fillText('Isi data → dapat nomor antrean → tunggu panggilan', W / 2, y + 56);
+  // kaki
+  g.fillStyle = HIJAU; g.fillRect(0, H - 110, W, 110);
+  g.fillStyle = '#d9eee2'; g.font = font('500', 26);
+  g.fillText(url.length > 70 ? url.slice(0, 67) + '…' : url, W / 2, H - 46);
+  document.body.removeChild(tmp);
   const a = document.createElement('a');
   a.href = c.toDataURL('image/png');
   a.download = 'QR-Antrean-' + instansi.replace(/[^A-Za-z0-9]+/g, '-') + '.png';
@@ -3300,7 +3373,7 @@ function renderManajemenShell() {
     <h2 class="page-heading">Pengaturan</h2>
 
     <div class="d-flex flex-wrap gap-2 mb-3" id="manajemenTabNav">
-      ${[['users', 'Tim / ASN'], ['wa', 'Template WA'], ['suara', 'Suara Panggilan'], ['pengaturan', 'Umum'], ['keamanan', 'Keamanan']].map(([k, label]) => `
+      ${[['users', 'Tim / ASN'], ['wa', 'Template WA'], ['suara', 'Suara Panggilan'], ['monitor', 'Monitor'], ['pengaturan', 'Umum'], ['keamanan', 'Keamanan']].map(([k, label]) => `
         <button class="btn ${k === 'users' ? 'btn-labuku-primary' : 'btn-labuku-outline'} btn-sm-pill" data-mtab="${k}" onclick="switchManajemenTab('${k}')">${label}</button>
       `).join('')}
     </div>
@@ -3318,6 +3391,7 @@ function switchManajemenTab(tab) {
   if (tab === 'users') loadManajemenUsers();
   else if (tab === 'wa') loadManajemenWa();
   else if (tab === 'suara') loadManajemenSuara();
+  else if (tab === 'monitor') loadManajemenMonitor();
   else if (tab === 'keamanan') loadManajemenKeamanan();
   else if (tab === 'pengaturan') loadManajemenPengaturan();
 }
@@ -3631,6 +3705,80 @@ function simpanSuara() {
       showToast('Berhasil', 'Suara panggilan disimpan untuk semua perangkat.', 'success');
     } else showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
   }, err => { btn.disabled = false; showToast('Error', err.message || err, 'danger'); }).saveSettings(obj);
+}
+
+/* ---------- v6.8 Tab: Monitor (isi layar monitor antrean — berlaku untuk semua layar) ---------- */
+const MONITOR_BAWAAN = {
+  judul: '', sub: 'Silakan menunggu nomor antrean Anda dipanggil', teks: 'Selamat datang di {instansi}.', nama: 'samar', berikut: 5, kecepatan: 'sedang', tema: 'hijau', slideDetik: 8, slide: [],
+  tampil: { jam: true, berikutnya: true, riwayat: true, qr: true, ringkasan: true, slide: false, teks: true, layanan: true }
+};
+const MONITOR_BAGIAN = [['jam', 'Jam & tanggal'], ['berikutnya', 'Daftar berikutnya'], ['riwayat', 'Riwayat panggilan (3 terakhir)'], ['qr', 'QR ambil antrean'],
+  ['ringkasan', 'Ringkasan hari ini'], ['layanan', 'Nama layanan'], ['teks', 'Teks berjalan'], ['slide', 'Slide gambar info']];
+function monitorCfg_() {
+  const m = (window.AppState.config && window.AppState.config.monitor) || {};
+  return Object.assign({}, MONITOR_BAWAAN, m, { tampil: Object.assign({}, MONITOR_BAWAAN.tampil, m.tampil || {}) });
+}
+function loadManajemenMonitor() {
+  const box = document.getElementById('manajemenContentBox');
+  const m = monitorCfg_();
+  const pilih = (id, opsi, nilai) => `<select class="form-select" id="${id}">${opsi.map(([v, l]) => `<option value="${v}" ${String(v) === String(nilai) ? 'selected' : ''}>${l}</option>`).join('')}</select>`;
+  box.innerHTML = `
+    <div class="lb-card mb-3" style="max-width:860px;">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap mb-2">
+        <div><h6 class="fw-bold mb-1">Layar Monitor Antrean</h6>
+          <div class="small text-secondary">Isi di sini berlaku untuk semua layar monitor. Ukuran, posisi, tata letak (lebar / strip tipis / tegak) & besar huruf diatur langsung di layar monitor (tombol ⚙).</div></div>
+        <button class="btn btn-labuku-primary" onclick="bukaMonitor()"><i class="bi bi-display"></i> Buka Monitor</button>
+      </div>
+      <div class="row g-3">
+        <div class="col-md-6"><label class="form-label" for="monJudul">Judul</label><input class="form-control" id="monJudul" maxlength="80" placeholder="${escapeHtml(instansiNama())}" value="${escapeHtml(m.judul)}"></div>
+        <div class="col-md-6"><label class="form-label" for="monSub">Subjudul</label><input class="form-control" id="monSub" maxlength="120" value="${escapeHtml(m.sub)}"></div>
+        <div class="col-12"><label class="form-label" for="monTeks">Teks berjalan <span class="fw-normal text-secondary">(satu pesan per baris; {instansi} = nama KUA)</span></label>
+          <textarea class="form-control" id="monTeks" rows="4" maxlength="1500">${escapeHtml(m.teks)}</textarea></div>
+        <div class="col-6 col-md-3"><label class="form-label" for="monKecepatan">Kecepatan teks</label>${pilih('monKecepatan', [['lambat', 'Lambat'], ['sedang', 'Sedang'], ['cepat', 'Cepat']], m.kecepatan)}</div>
+        <div class="col-6 col-md-3"><label class="form-label" for="monNama">Nama pemohon</label>${pilih('monNama', [['samar', 'Disamarkan (RINA W.)'], ['penuh', 'Nama lengkap'], ['tanpa', 'Tanpa nama']], m.nama)}</div>
+        <div class="col-6 col-md-3"><label class="form-label" for="monBerikut">Jumlah "berikutnya"</label>${pilih('monBerikut', [3, 4, 5, 6, 8, 10].map(n => [n, n + ' nomor']), m.berikut)}</div>
+        <div class="col-6 col-md-3"><label class="form-label" for="monTema">Warna</label>${pilih('monTema', [['hijau', 'Hijau KUA'], ['gelap', 'Gelap'], ['terang', 'Terang']], m.tema)}</div>
+        <div class="col-12"><label class="form-label">Bagian yang tampil</label>
+          <div class="d-flex flex-wrap gap-3">${MONITOR_BAGIAN.map(([k, l]) => `<label class="form-check mb-0"><input type="checkbox" class="form-check-input mon-tampil" data-k="${k}" ${m.tampil[k] ? 'checked' : ''}> <span class="form-check-label">${l}</span></label>`).join('')}</div></div>
+        <div class="col-md-9"><label class="form-label" for="monSlide">Slide gambar info <span class="fw-normal text-secondary">(satu tautan https per baris, maks. 10; tautan Google Drive harus "Siapa saja yang memiliki link")</span></label>
+          <textarea class="form-control" id="monSlide" rows="3" placeholder="https://drive.google.com/file/d/.../view">${escapeHtml((m.slide || []).join(NL))}</textarea></div>
+        <div class="col-md-3"><label class="form-label" for="monSlideDetik">Ganti slide tiap</label>${pilih('monSlideDetik', [5, 8, 10, 15, 20, 30].map(n => [n, n + ' detik']), m.slideDetik)}</div>
+      </div>
+      <button class="btn btn-labuku-primary mt-3" id="monSimpanBtn" onclick="simpanMonitor()"><i class="bi bi-save"></i> Simpan</button>
+    </div>
+    <div class="lb-card" style="max-width:860px;">
+      <h6 class="fw-bold mb-2">Cara memasang di monitor kedua</h6>
+      <ol class="small mb-0 ps-3">
+        <li>Sambungkan monitor/TV, lalu di Windows tekan <b>Win + P</b> → <b>Extend</b> (Perluas).</li>
+        <li>Klik <b>Buka Monitor</b>. Di Chrome/Edge, izinkan "kelola jendela" agar langsung muncul di layar kedua; bila tidak, seret jendelanya ke layar kedua.</li>
+        <li>Di layar monitor: gerakkan mouse → klik <b>⚙</b> → pilih tata letak & ukuran (mis. strip 1920×300 untuk layar tipis) → <b>Layar penuh</b>.</li>
+        <li>Suara panggilan tetap keluar dari komputer loket. Bila monitor dijalankan di komputer lain, nyalakan "Bunyikan panggilan di layar ini" di ⚙.</li>
+      </ol>
+    </div>`;
+}
+function simpanMonitor() {
+  const tampil = {};
+  document.querySelectorAll('.mon-tampil').forEach(el => { tampil[el.dataset.k] = el.checked; });
+  const slide = document.getElementById('monSlide').value.split(/\r?\n/).map(x => x.trim()).filter(Boolean);
+  const salah = slide.filter(u => !/^https:\/\//.test(u));
+  if (salah.length) { showToast('Peringatan', 'Tautan slide harus diawali https:// — periksa: ' + salah[0], 'warning'); return; }
+  const obj = {
+    judul: document.getElementById('monJudul').value.trim(), sub: document.getElementById('monSub').value.trim(),
+    teks: document.getElementById('monTeks').value.replace(CR_RE, '').trim(), kecepatan: document.getElementById('monKecepatan').value,
+    nama: document.getElementById('monNama').value, berikut: Number(document.getElementById('monBerikut').value), tema: document.getElementById('monTema').value,
+    slide: slide.slice(0, 10), slideDetik: Number(document.getElementById('monSlideDetik').value), tampil: tampil
+  };
+  const btn = document.getElementById('monSimpanBtn');
+  btn.disabled = true;
+  gsr(res => {
+    btn.disabled = false;
+    if (res && res.success) {
+      window.AppState.config.monitor = obj;
+      saveAppStateCache();
+      kirimKeMonitor_({ tipe: 'segarkan' });
+      showToast('Berhasil', 'Pengaturan monitor disimpan. Layar monitor berubah dalam beberapa detik.', 'success');
+    } else showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
+  }, err => { btn.disabled = false; showToast('Error', err.message || err, 'danger'); }).saveSettings({ monitor_json: JSON.stringify(obj) });
 }
 
 /* ---------- Tab: Umum (identitas, wilayah utama, tautan, tampilan) ---------- */

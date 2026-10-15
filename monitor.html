@@ -1,0 +1,398 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Monitor Antrean — LABUKU Desk</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <!--
+    v6.8 — Layar MONITOR antrean (monitor kedua / TV ruang tunggu).
+    - Isi (judul, teks berjalan, bagian yang tampil, nama, slide): Pengaturan → Monitor (berlaku semua layar).
+    - Ukuran, posisi, tata letak & skala huruf: diatur DI LAYAR INI (tombol ⚙ muncul saat mouse digerakkan).
+    - Data: diambil dari server tiap 8 detik + langsung saat petugas menekan Panggil di browser yang sama.
+  -->
+  <style>
+    :root { --u: 10px; --bg: #10291f; --bg2: #163a2a; --kartu: rgba(255,255,255,.07); --garis: rgba(255,255,255,.14);
+      --teks: #ffffff; --teks2: #b9d6c7; --aksen: #D4A017; --aksen-teks: #1B4332; --utama: #1B4332; }
+    body.tema-gelap { --bg: #0b0f14; --bg2: #121a24; --kartu: rgba(255,255,255,.06); --garis: rgba(255,255,255,.12); --teks: #f4f7fb; --teks2: #9fb0c3; --aksen: #f5c542; --aksen-teks: #111; }
+    body.tema-terang { --bg: #f3f6f2; --bg2: #ffffff; --kartu: #ffffff; --garis: #dfe6e1; --teks: #10291f; --teks2: #4b6357; --aksen: #1B4332; --aksen-teks: #fff; }
+    * { box-sizing: border-box; }
+    html, body { margin: 0; height: 100%; background: #000; font-family: 'Inter', Arial, sans-serif; overflow: hidden; }
+    body.idle, body.idle * { cursor: none !important; }
+    #stage { position: absolute; overflow: hidden; color: var(--teks); background: linear-gradient(160deg, var(--bg), var(--bg2)); display: flex; flex-direction: column; }
+    .kepala { display: flex; align-items: center; gap: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.2) calc(var(--u) * 2.2); border-bottom: 1px solid var(--garis); }
+    .merek { font-weight: 800; letter-spacing: .04em; font-size: calc(var(--u) * 1.5); color: var(--aksen); white-space: nowrap; }
+    .merek small { display: block; font-size: .5em; font-weight: 500; letter-spacing: .02em; color: var(--teks2); }
+    .judul { flex: 1; min-width: 0; }
+    .judul b { display: block; font-size: calc(var(--u) * 2.3); line-height: 1.15; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .judul span { font-size: calc(var(--u) * 1.15); color: var(--teks2); }
+    .jam { text-align: right; white-space: nowrap; }
+    .jam b { display: block; font-size: calc(var(--u) * 3); font-variant-numeric: tabular-nums; line-height: 1; }
+    .jam span { font-size: calc(var(--u) * 1.05); color: var(--teks2); }
+    .isi { flex: 1; min-height: 0; display: grid; gap: calc(var(--u) * 1.4); padding: calc(var(--u) * 1.4) calc(var(--u) * 2.2); }
+    .kol { display: flex; flex-direction: column; gap: calc(var(--u) * 1.4); min-height: 0; min-width: 0; }
+    .kartu { background: var(--kartu); border: 1px solid var(--garis); border-radius: calc(var(--u) * 1.4); padding: calc(var(--u) * 1.4) calc(var(--u) * 1.8); min-height: 0; }
+    .label { text-transform: uppercase; letter-spacing: .12em; font-weight: 700; font-size: calc(var(--u) * 1.2); color: var(--teks2); }
+    .panggil { flex: 1; display: flex; flex-direction: column; align-items: center; justify-content: center; text-align: center; position: relative; }
+    .panggil .nomor { font-weight: 800; font-size: calc(var(--u) * 15); line-height: 1; white-space: nowrap; letter-spacing: .02em; font-variant-numeric: tabular-nums; margin: calc(var(--u) * .6) 0; }
+    .panggil .tujuan { display: inline-block; background: var(--aksen); color: var(--aksen-teks); font-weight: 800; border-radius: 999px; padding: calc(var(--u) * .5) calc(var(--u) * 2); font-size: calc(var(--u) * 2.2); text-transform: uppercase; letter-spacing: .04em; }
+    .panggil .nama { font-size: calc(var(--u) * 2.6); font-weight: 700; margin-top: calc(var(--u) * 1.2); }
+    .panggil .lay { font-size: calc(var(--u) * 1.7); color: var(--teks2); margin-top: calc(var(--u) * .4); }
+    .panggil.baru { animation: kedip 1s ease-in-out 5; }
+    @keyframes kedip { 0%, 100% { box-shadow: 0 0 0 0 transparent; } 50% { box-shadow: 0 0 0 calc(var(--u) * .5) var(--aksen); } }
+    .daftar { display: flex; flex-direction: column; gap: calc(var(--u) * .7); margin-top: calc(var(--u) * 1); overflow: hidden; }
+    .baris { display: flex; align-items: baseline; gap: calc(var(--u) * 1.2); padding-bottom: calc(var(--u) * .6); border-bottom: 1px dashed var(--garis); }
+    .baris:last-child { border-bottom: 0; }
+    .baris b { font-size: calc(var(--u) * 2.6); font-variant-numeric: tabular-nums; min-width: 4.3em; }
+    .baris span { font-size: calc(var(--u) * 1.5); color: var(--teks2); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .kosong { color: var(--teks2); font-size: calc(var(--u) * 1.5); margin-top: calc(var(--u) * 1); }
+    .qr { display: flex; align-items: center; gap: calc(var(--u) * 1.4); }
+    .qr .kode { background: #fff; padding: calc(var(--u) * .6); border-radius: calc(var(--u) * .8); line-height: 0; }
+    .qr .kode img, .qr .kode canvas { width: calc(var(--u) * 11); height: calc(var(--u) * 11); }
+    .qr p { margin: 0; font-size: calc(var(--u) * 1.5); font-weight: 700; }
+    .qr p small { display: block; font-weight: 500; color: var(--teks2); font-size: .72em; margin-top: .3em; }
+    .chip-row { display: flex; gap: calc(var(--u) * 1); flex-wrap: wrap; }
+    .chip { flex: 1; text-align: center; background: var(--kartu); border: 1px solid var(--garis); border-radius: calc(var(--u) * 1); padding: calc(var(--u) * .7) calc(var(--u) * .6); }
+    .chip b { display: block; font-size: calc(var(--u) * 2.4); }
+    .chip span { font-size: calc(var(--u) * 1); color: var(--teks2); text-transform: uppercase; letter-spacing: .06em; }
+    .riwayat { display: flex; gap: calc(var(--u) * 1.2); align-items: center; flex-wrap: wrap; }
+    .riwayat b { font-size: calc(var(--u) * 2); color: var(--teks2); font-variant-numeric: tabular-nums; }
+    .slide { position: relative; flex: 1; min-height: calc(var(--u) * 10); border-radius: calc(var(--u) * 1.4); overflow: hidden; background: rgba(0,0,0,.2); }
+    .slide img { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: contain; opacity: 0; transition: opacity .8s; }
+    .slide img.aktif { opacity: 1; }
+    .jalan { overflow: hidden; white-space: nowrap; background: var(--aksen); color: var(--aksen-teks); font-weight: 700; font-size: calc(var(--u) * 1.8); padding: calc(var(--u) * .7) 0; }
+    .jalan span { display: inline-block; padding-left: 100%; animation: jalan linear infinite; }
+    @keyframes jalan { from { transform: translateX(0); } to { transform: translateX(-100%); } }
+    /* Tata letak */
+    .L-lebar .isi { grid-template-columns: 1.65fr 1fr; }
+    .L-tegak .isi { display: flex; flex-direction: column; }
+    .L-tegak .kol-utama { flex: 1.25; }
+    .L-tegak .kol-utama .panggil .nomor { font-size: calc(var(--u) * 12); }
+    .L-tegak .kol-samping { flex: 1; display: grid; grid-template-columns: 1fr 1fr; grid-template-rows: 1fr auto; }
+    .L-tegak #mBerikutBox { grid-column: 1 / -1; }
+    .L-tegak .ringkas-kartu { flex-direction: column; }
+    .L-tegak .qr { flex-direction: column; justify-content: center; text-align: center; }
+    .L-tegak .jalan { font-size: calc(var(--u) * 2); }
+    .L-strip .kepala { display: none; }
+    .L-strip .isi { display: flex; align-items: stretch; padding: calc(var(--u) * .6) calc(var(--u) * 1); gap: calc(var(--u) * .8); }
+    .L-strip .kol { flex-direction: row; gap: calc(var(--u) * .8); }
+    .L-strip .kol-utama { flex: 0 0 auto; }
+    .L-strip .kol-samping { flex: 1; }
+    .L-strip .kartu { border-radius: calc(var(--u) * .8); }
+    .L-strip .panggil { flex-direction: row; gap: calc(var(--u) * 1.2); padding: calc(var(--u) * .4) calc(var(--u) * 1.4); }
+    .L-strip .panggil .label { font-size: calc(var(--u) * .8); writing-mode: vertical-rl; transform: rotate(180deg); }
+    .L-strip .panggil .nomor { font-size: calc(var(--u) * 5.4); margin: 0; }
+    .L-strip .panggil .tujuan { font-size: calc(var(--u) * 1.4); padding: calc(var(--u) * .35) calc(var(--u) * 1.2); }
+    .L-strip .panggil .nama, .L-strip .panggil .lay, .L-strip .riwayat-kartu, .L-strip .slide-kartu, .L-strip .ringkas-kartu { display: none !important; }
+    .L-strip .berikut-kartu { flex: 1; display: flex; align-items: center; gap: calc(var(--u) * 1.2); padding: calc(var(--u) * .4) calc(var(--u) * 1.2); min-width: 0; }
+    .L-strip .berikut-kartu .label { font-size: calc(var(--u) * .9); }
+    .L-strip .daftar { flex-direction: row; margin: 0; gap: calc(var(--u) * 1.8); }
+    .L-strip .baris { border: 0; padding: 0; }
+    .L-strip .baris b { font-size: calc(var(--u) * 2.6); min-width: 0; }
+    .L-strip .baris span { display: none; }
+    .L-strip .kosong { margin: 0; }
+    .L-strip .qr { padding: calc(var(--u) * .4) calc(var(--u) * .8); gap: calc(var(--u) * .8); }
+    .L-strip .qr .kode { padding: calc(var(--u) * .3); }
+    .L-strip .qr .kode img, .L-strip .qr .kode canvas { width: calc(var(--u) * 6); height: calc(var(--u) * 6); }
+    .L-strip .qr p { font-size: calc(var(--u) * 1.05); }
+    .L-strip .jalan { font-size: calc(var(--u) * 1.3); padding: calc(var(--u) * .35) 0; }
+    .L-strip .jam-strip { display: flex; }
+    .jam-strip { display: none; flex-direction: column; justify-content: center; text-align: right; }
+    .jam-strip b { font-size: calc(var(--u) * 3); }
+    .sembunyi { display: none !important; }
+    /* Status koneksi & pengaturan layar */
+    #status { position: absolute; right: calc(var(--u) * .6); bottom: calc(var(--u) * .4); width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; opacity: .5; z-index: 5; }
+    #status.putus { background: #e74c3c; opacity: 1; }
+    #gear { position: fixed; top: 12px; right: 12px; z-index: 30; border: 0; border-radius: 50%; width: 46px; height: 46px; background: rgba(0,0,0,.6); color: #fff; font-size: 24px; cursor: pointer; transition: opacity .3s; }
+    body.idle #gear { opacity: 0; pointer-events: none; }
+    #panel { position: fixed; top: 0; right: 0; bottom: 0; width: min(380px, 100vw); background: #fff; color: #10291f; z-index: 40; padding: 18px; overflow-y: auto; box-shadow: -8px 0 30px rgba(0,0,0,.35); font-size: 14px; display: none; }
+    #panel.buka { display: block; }
+    #panel h3 { margin: 0 0 4px; font-size: 18px; }
+    #panel .ket { color: #4b6357; font-size: 12.5px; margin: 0 0 14px; }
+    #panel label { display: block; font-weight: 600; margin: 12px 0 4px; }
+    #panel input[type=number], #panel select { width: 100%; padding: 8px 10px; border: 1px solid #cfd8d3; border-radius: 8px; font-size: 14px; }
+    #panel .dua { display: grid; grid-template-columns: 1fr 1fr; gap: 8px; }
+    #panel .tombol { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 16px; }
+    #panel button.b { flex: 1; padding: 10px; border-radius: 10px; border: 1px solid #1B4332; background: #fff; color: #1B4332; font-weight: 700; cursor: pointer; }
+    #panel button.b.utama { background: #1B4332; color: #fff; }
+    #panel .cepat { display: flex; gap: 6px; flex-wrap: wrap; margin-top: 6px; }
+    #panel .cepat button { border: 1px solid #cfd8d3; background: #f3f6f2; border-radius: 999px; padding: 4px 10px; font-size: 12px; cursor: pointer; }
+    #pesan { position: fixed; inset: 0; display: none; align-items: center; justify-content: center; text-align: center; padding: 2rem; background: #10291f; color: #fff; z-index: 20; font-size: 20px; }
+    #pesan.tampil { display: flex; }
+    #pesan a { color: #D4A017; }
+  </style>
+</head>
+<body class="tema-hijau">
+  <div id="stage" class="L-lebar">
+    <header class="kepala">
+      <div class="merek">LABUKU DESK<small>Layanan Administrasi dan Pembukuan KUA</small></div>
+      <div class="judul"><b id="mJudul">KUA</b><span id="mSub"></span></div>
+      <div class="jam" id="mJamBox"><b id="mJam">--:--</b><span id="mTgl"></span></div>
+    </header>
+    <main class="isi">
+      <section class="kol kol-utama">
+        <div class="kartu panggil" id="mPanggil">
+          <div class="label">Nomor dipanggil</div>
+          <div class="nomor" id="mNomor">–</div>
+          <div><span class="tujuan" id="mTujuan">LOKET</span></div>
+          <div class="nama" id="mNama"></div>
+          <div class="lay" id="mLay"></div>
+        </div>
+        <div class="kartu riwayat-kartu" id="mRiwayatBox"><div class="riwayat"><span class="label">Sebelumnya</span><span id="mRiwayat"></span></div></div>
+        <div class="kartu slide-kartu slide" id="mSlide"></div>
+      </section>
+      <section class="kol kol-samping">
+        <div class="kartu berikut-kartu" id="mBerikutBox" style="flex:1;"><div class="label">Berikutnya</div><div class="daftar" id="mBerikut"></div></div>
+        <div class="chip-row ringkas-kartu" id="mRingkas"></div>
+        <div class="kartu qr" id="mQrBox"><div class="kode" id="mQr"></div><p>Ambil nomor antrean<small>Scan QR dengan kamera HP</small></p></div>
+        <div class="jam-strip" id="mJamStrip"><b id="mJam2">--:--</b></div>
+      </section>
+    </main>
+    <footer class="jalan" id="mJalan"><span id="mJalanTeks"></span></footer>
+    <div id="status" title="Koneksi"></div>
+  </div>
+
+  <button id="gear" title="Atur layar ini" aria-label="Atur layar ini">⚙</button>
+  <aside id="panel" aria-label="Pengaturan layar ini">
+    <h3>Atur layar ini</h3>
+    <p class="ket">Tersimpan di komputer ini saja. Isi monitor (teks berjalan, judul, bagian yang tampil) diatur Kepala KUA di <b>Pengaturan → Monitor</b>.</p>
+    <label for="pTata">Tata letak</label>
+    <select id="pTata">
+      <option value="lebar">Lebar 16:9 (disarankan)</option>
+      <option value="strip">Strip tipis / banner</option>
+      <option value="tegak">Tegak (TV diputar)</option>
+    </select>
+    <label>Ukuran tampilan (piksel, 0 = memenuhi jendela)</label>
+    <div class="dua"><input type="number" id="pLebar" min="0" max="7680" step="10" placeholder="Lebar"><input type="number" id="pTinggi" min="0" max="4320" step="10" placeholder="Tinggi"></div>
+    <div class="cepat" id="pUkuranCepat">
+      <button data-u="0x0">Penuh</button><button data-u="1920x1080">1920×1080</button><button data-u="1366x768">1366×768</button><button data-u="1920x360">Strip 1920×360</button><button data-u="1920x200">Strip 1920×200</button><button data-u="1080x1920">Tegak 1080×1920</button>
+    </div>
+    <label>Posisi dari kiri / atas (piksel)</label>
+    <div class="dua"><input type="number" id="pX" min="0" max="7680" step="10" placeholder="Kiri"><input type="number" id="pY" min="0" max="4320" step="10" placeholder="Atas"></div>
+    <label for="pSkala">Ukuran huruf: <b id="pSkalaLb">100%</b></label>
+    <input type="range" id="pSkala" min="50" max="200" step="5" style="width:100%">
+    <label><input type="checkbox" id="pSuara"> Bunyikan panggilan di layar ini</label>
+    <p class="ket" style="margin:2px 0 0">Nyalakan bila monitor ini dijalankan di komputer lain. Bila di komputer yang sama dengan loket, biarkan mati agar suara tidak dobel.</p>
+    <div class="tombol">
+      <button class="b" id="pPenuh">Layar penuh</button>
+      <button class="b" id="pReset">Setelan awal</button>
+      <button class="b utama" id="pTutup">Selesai</button>
+    </div>
+  </aside>
+  <div id="pesan"></div>
+
+  <script src="js/config.js"></script>
+  <script src="js/gas-run.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+  <script>
+  (function () {
+    'use strict';
+    var KUNCI_LAYAR = 'labuku_monitor_layar';
+    var SETEL_AWAL = { tata: 'lebar', lebar: 0, tinggi: 0, x: 0, y: 0, skala: 100, suara: false };
+    var KECEPATAN = { lambat: 45, sedang: 80, cepat: 130 }; // piksel per detik
+    var ANGKA = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
+    var D = null, idSekarang = null, pertama = true, slideIdx = 0, slideTimer = null, tarikTimer = null, teksTerakhir = '', qrDibuat = false;
+    function el(id) { return document.getElementById(id); }
+    function lsGet(k) { try { return localStorage.getItem(k); } catch (e) { return null; } }
+    function lsSet(k, v) { try { localStorage.setItem(k, v); } catch (e) {} }
+    function layar() { var s = {}; try { s = JSON.parse(lsGet(KUNCI_LAYAR) || '{}') || {}; } catch (e) {} return Object.assign({}, SETEL_AWAL, s); }
+    function simpanLayar(s) { lsSet(KUNCI_LAYAR, JSON.stringify(s)); terapkanLayar(); }
+    function teks(id, v) { var e = el(id); if (e) e.textContent = v == null ? '' : String(v); }
+    function tampil(id, ya) { var e = el(id); if (e) e.classList.toggle('sembunyi', !ya); }
+    function samarkan(nama, mode) {
+      nama = String(nama || '').replace(/\s+/g, ' ').trim().toUpperCase();
+      if (mode === 'tanpa' || !nama) return '';
+      if (mode === 'penuh') return nama;
+      var k = nama.split(' ');
+      return [k[0]].concat(k.slice(1).map(function (x) { return x.charAt(0) + '.'; })).join(' ');
+    }
+
+    /* ---------- Ukuran & tata letak layar ini ---------- */
+    function terapkanLayar() {
+      var s = layar(), st = el('stage');
+      var W = Number(s.lebar) > 0 ? Number(s.lebar) : window.innerWidth;
+      var H = Number(s.tinggi) > 0 ? Number(s.tinggi) : window.innerHeight;
+      st.style.left = (Number(s.x) || 0) + 'px'; st.style.top = (Number(s.y) || 0) + 'px';
+      st.style.width = W + 'px'; st.style.height = H + 'px';
+      st.className = 'L-' + (['lebar', 'strip', 'tegak'].indexOf(s.tata) >= 0 ? s.tata : 'lebar');
+      var u;
+      if (s.tata === 'strip') u = Math.min(H / 10.5, W / 110);
+      else if (s.tata === 'tegak') u = Math.min(W / 56, H / 100);
+      else u = Math.min(W / 100, H / 56);
+      u = u * (Number(s.skala) || 100) / 100;
+      st.style.setProperty('--u', Math.max(3, u).toFixed(2) + 'px');
+      aturJalan();
+    }
+    window.addEventListener('resize', terapkanLayar);
+
+    /* ---------- Jam ---------- */
+    function detak() {
+      var n = new Date();
+      var j = String(n.getHours()).padStart(2, '0') + ':' + String(n.getMinutes()).padStart(2, '0');
+      teks('mJam', j); teks('mJam2', j);
+      teks('mTgl', n.toLocaleDateString('id-ID', { weekday: 'long', day: 'numeric', month: 'long', year: 'numeric' }));
+    }
+    setInterval(detak, 1000 * 15); detak();
+
+    /* ---------- Teks berjalan ---------- */
+    function aturJalan() {
+      var sp = el('mJalanTeks');
+      if (!sp || !sp.textContent) return;
+      var m = (D && D.monitor) || {};
+      var lebar = sp.scrollWidth || 1000;
+      sp.style.animationDuration = Math.max(8, Math.round(lebar / (KECEPATAN[m.kecepatan] || 80))) + 's';
+    }
+
+    /* ---------- Slide gambar ---------- */
+    function urlGambar(u) {
+      var m = String(u).match(/drive\.google\.com\/(?:file\/d\/|open\?id=|uc\?(?:export=\w+&)?id=)([-\w]{20,})/);
+      return m ? 'https://drive.google.com/thumbnail?id=' + m[1] + '&sz=w1920' : u;
+    }
+    function aturSlide(m) {
+      var box = el('mSlide'), daftar = (m.slide || []).map(urlGambar);
+      var kunci = daftar.join('|') + '#' + m.slideDetik;
+      if (box.dataset.kunci === kunci) return;
+      box.dataset.kunci = kunci; box.innerHTML = '';
+      clearInterval(slideTimer); slideIdx = 0;
+      daftar.forEach(function (u, i) { var im = new Image(); im.alt = ''; im.src = u; if (i === 0) im.className = 'aktif'; box.appendChild(im); });
+      if (daftar.length > 1) slideTimer = setInterval(function () {
+        var ims = box.querySelectorAll('img'); if (!ims.length) return;
+        ims[slideIdx % ims.length].classList.remove('aktif'); slideIdx++; ims[slideIdx % ims.length].classList.add('aktif');
+      }, (m.slideDetik || 8) * 1000);
+    }
+
+    /* ---------- QR form antrean publik ---------- */
+    function buatQr() {
+      if (qrDibuat || typeof QRCode === 'undefined') return;
+      var url; try { url = new URL('antrean.html', location.href).href; } catch (e) { return; }
+      new QRCode(el('mQr'), { text: url, width: 300, height: 300, correctLevel: QRCode.CorrectLevel.M });
+      qrDibuat = true;
+    }
+
+    /* ---------- Suara (opsional di layar ini) ---------- */
+    function ucapPanggilan(s) {
+      if (!layar().suara || !s || !window.speechSynthesis) return;
+      var cfg = (D && D.suara) || {};
+      var nomor = String(s.nomor || '').split('').map(function (c) { return /\d/.test(c) ? ANGKA[+c] : (/[a-z]/i.test(c) ? c.toUpperCase() : ''); }).filter(Boolean).join(' ');
+      var vars = { nomor: nomor, nama: String(s.namaUcap || '').toLowerCase().replace(/\b\w/g, function (c) { return c.toUpperCase(); }), layanan: s.layanan || '', tujuan: cfg.suara_tujuan || 'loket', instansi: (D && D.instansi) || 'KUA' };
+      var kal = String(cfg.suara_kalimat || 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.').replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined ? vars[k] : m; });
+      window.__ucapMonitor = kal;
+      try {
+        window.speechSynthesis.cancel();
+        for (var i = 0; i < Math.max(1, Math.min(3, Number(cfg.suara_ulang) || 1)); i++) {
+          var u = new SpeechSynthesisUtterance(kal); u.lang = 'id-ID'; u.rate = 0.9; window.speechSynthesis.speak(u);
+        }
+      } catch (e) {}
+    }
+
+    /* ---------- Tampilkan data ---------- */
+    function render() {
+      if (!D) return;
+      var m = D.monitor || {}, t = m.tampil || {};
+      document.body.className = 'tema-' + (m.tema || 'hijau') + (document.body.classList.contains('idle') ? ' idle' : '');
+      teks('mJudul', m.judul || D.instansi || 'KUA');
+      teks('mSub', m.sub || '');
+      tampil('mJamBox', t.jam !== false); tampil('mJamStrip', t.jam !== false);
+      var tujuan = String((D.suara && D.suara.suara_tujuan) || 'loket');
+      var s = D.sekarang;
+      teks('mNomor', s ? s.nomor : '–');
+      teks('mTujuan', s ? 'menuju ' + tujuan : 'Belum ada panggilan');
+      teks('mNama', s ? s.nama : ''); tampil('mNama', !!(s && s.nama));
+      teks('mLay', s ? s.layanan : ''); tampil('mLay', !!(s && s.layanan && t.layanan !== false));
+      if (s && s.id !== idSekarang) {
+        if (!pertama) { var p = el('mPanggil'); p.classList.remove('baru'); void p.offsetWidth; p.classList.add('baru'); ucapPanggilan(s); }
+        idSekarang = s.id;
+      }
+      pertama = false;
+      el('mBerikut').innerHTML = (D.berikut || []).length ? D.berikut.map(function (b) {
+        return '<div class="baris"><b>' + esc(b.nomor) + '</b><span>' + esc([b.nama, t.layanan !== false ? b.layanan : ''].filter(Boolean).join(' · ')) + '</span></div>';
+      }).join('') : '<div class="kosong">Tidak ada antrean menunggu</div>';
+      tampil('mBerikutBox', t.berikutnya !== false);
+      el('mRiwayat').innerHTML = (D.riwayat || []).map(function (r) { return '<b>' + esc(r.nomor) + '</b>'; }).join('') || '<span class="kosong" style="margin:0">–</span>';
+      tampil('mRiwayatBox', t.riwayat !== false);
+      var rk = D.ringkasan || {};
+      el('mRingkas').innerHTML = [['Antrean hari ini', rk.total], ['Menunggu', rk.menunggu], ['Selesai', rk.selesai]].map(function (x) { return '<div class="chip"><b>' + (x[1] || 0) + '</b><span>' + x[0] + '</span></div>'; }).join('');
+      tampil('mRingkas', t.ringkasan !== false);
+      tampil('mQrBox', t.qr !== false); if (t.qr !== false) buatQr();
+      var adaSlide = t.slide && (m.slide || []).length;
+      tampil('mSlide', !!adaSlide); if (adaSlide) aturSlide(m);
+      var jalan = String(m.teks || '').replace(/\{instansi\}/g, D.instansi || 'KUA').split(/\r?\n/).map(function (x) { return x.trim(); }).filter(Boolean).join('     •     ');
+      tampil('mJalan', t.teks !== false && !!jalan);
+      if (jalan !== teksTerakhir) { teksTerakhir = jalan; teks('mJalanTeks', jalan); aturJalan(); }
+    }
+    function esc(v) { return String(v == null ? '' : v).replace(/[&<>"']/g, function (c) { return { '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]; }); }
+    function pesan(html) { var p = el('pesan'); p.innerHTML = html; p.classList.toggle('tampil', !!html); }
+
+    /* ---------- Ambil data: tiap 8 detik + seketika saat ada panggilan dari loket di browser ini ---------- */
+    function tarik() {
+      clearTimeout(tarikTimer);
+      var token = lsGet('labuku_token');
+      if (!token) { pesan('Buka & masuk ke <b>LABUKU Desk</b> di browser ini dulu, lalu buka lagi layar monitor.<br><br><a href="index.html">Buka LABUKU Desk</a>'); tarikTimer = setTimeout(tarik, 5000); return; }
+      google.script.run.withSuccessHandler(function (res) {
+        el('status').classList.remove('putus');
+        if (res && res.code === 'AUTH') { pesan('Sesi berakhir. Masuk lagi ke <a href="index.html">LABUKU Desk</a> di browser ini.'); tarikTimer = setTimeout(tarik, 10000); return; }
+        if (res && res.success) { pesan(''); D = res.data; render(); }
+        tarikTimer = setTimeout(tarik, 8000);
+      }).withFailureHandler(function () {
+        el('status').classList.add('putus');
+        tarikTimer = setTimeout(tarik, 10000);
+      }).api({ token: token, who: lsGet('labuku_who') || 'Monitor' }, 'getMonitorData', []);
+    }
+    window.__monitorTarik = tarik;
+    var segarJeda = null;
+    try {
+      var kanal = new BroadcastChannel('labuku_monitor');
+      kanal.onmessage = function (ev) {
+        var m = ev.data || {};
+        if (m.tipe === 'panggil' && m.row && D) {
+          // langsung tampil (optimistik), lalu dicocokkan dengan server
+          var r = m.row, mode = (D.monitor && D.monitor.nama) || 'samar';
+          if (D.sekarang && D.sekarang.id !== r.ID) D.riwayat = [D.sekarang].concat(D.riwayat || []).slice(0, 3);
+          D.sekarang = { id: r.ID, nomor: r.Nomor, nama: samarkan(r.PemohonNama, mode), namaUcap: r.PemohonNama, layanan: r.LayananNama || '' };
+          D.berikut = (D.berikut || []).filter(function (b) { return b.id !== r.ID; });
+          render();
+        }
+        clearTimeout(segarJeda); segarJeda = setTimeout(tarik, 1500);
+      };
+    } catch (e) {}
+
+    /* ---------- Panel pengaturan layar ini ---------- */
+    var idleT = null;
+    function bangun() { document.body.classList.remove('idle'); clearTimeout(idleT); idleT = setTimeout(function () { if (!el('panel').classList.contains('buka')) document.body.classList.add('idle'); }, 3000); }
+    document.addEventListener('mousemove', bangun); document.addEventListener('touchstart', bangun); bangun();
+    function isiPanel() {
+      var s = layar();
+      el('pTata').value = s.tata; el('pLebar').value = s.lebar || 0; el('pTinggi').value = s.tinggi || 0;
+      el('pX').value = s.x || 0; el('pY').value = s.y || 0; el('pSkala').value = s.skala; el('pSkalaLb').textContent = s.skala + '%'; el('pSuara').checked = !!s.suara;
+    }
+    function bacaPanel() {
+      var n = function (id) { var v = Math.round(Number(el(id).value)); return isNaN(v) || v < 0 ? 0 : v; };
+      return { tata: el('pTata').value, lebar: n('pLebar'), tinggi: n('pTinggi'), x: n('pX'), y: n('pY'), skala: Math.min(200, Math.max(50, n('pSkala') || 100)), suara: el('pSuara').checked };
+    }
+    ['pTata', 'pLebar', 'pTinggi', 'pX', 'pY', 'pSkala', 'pSuara'].forEach(function (id) {
+      el(id).addEventListener('input', function () { el('pSkalaLb').textContent = el('pSkala').value + '%'; simpanLayar(bacaPanel()); });
+      el(id).addEventListener('change', function () { simpanLayar(bacaPanel()); });
+    });
+    el('pUkuranCepat').addEventListener('click', function (ev) {
+      var u = ev.target.getAttribute('data-u'); if (!u) return;
+      var a = u.split('x'); el('pLebar').value = a[0]; el('pTinggi').value = a[1];
+      if (+a[1] > 0 && +a[1] <= 400) el('pTata').value = 'strip'; else if (+a[1] > +a[0]) el('pTata').value = 'tegak'; else if (+a[0] > 0) el('pTata').value = 'lebar';
+      simpanLayar(bacaPanel());
+    });
+    el('gear').addEventListener('click', function () { isiPanel(); el('panel').classList.add('buka'); });
+    el('pTutup').addEventListener('click', function () { el('panel').classList.remove('buka'); bangun(); });
+    el('pReset').addEventListener('click', function () { simpanLayar(Object.assign({}, SETEL_AWAL)); isiPanel(); });
+    el('pPenuh').addEventListener('click', function () {
+      var d = document.documentElement;
+      if (document.fullscreenElement) document.exitFullscreen(); else if (d.requestFullscreen) d.requestFullscreen().catch(function () {});
+    });
+    document.addEventListener('keydown', function (ev) { if (ev.key === 'Escape') el('panel').classList.remove('buka'); });
+
+    terapkanLayar();
+    tarik();
+  })();
+  </script>
+</body>
+</html>
