@@ -1081,6 +1081,7 @@ function renderFrontOffice() {
         </div>
         <div class="d-flex gap-2 flex-wrap head-aksi">
           <button class="btn btn-labuku-outline btn-filter-hp" onclick="toggleFilterHp('foFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
+          <button class="btn btn-labuku-outline" id="foSapaBtn" onclick="sapaPengunjungFo()" title="Tampilkan sapaan & cara ambil antrean di layar monitor (45 detik)"><i class="bi bi-emoji-smile"></i> <span class="label-lebar">Selamat Datang</span><span class="label-hp">Sapa</span></button>
           <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> <span class="label-lebar">Link &amp; QR Form Publik</span><span class="label-hp">QR</span></button>
           <button class="btn btn-labuku-outline" id="foWaMassalBtn" onclick="bukaWaMassal()" title="Kirim WA nomor antrean ke semua yang belum"><i class="bi bi-whatsapp"></i> <span class="label-lebar">WA Belum Terkirim</span><span class="label-hp">WA</span> <span class="badge rounded-pill text-bg-success" id="foWaMassalN">0</span></button>
           <button class="btn btn-labuku-outline" onclick="bukaPengaturanPerangkat()" title="Suara panggilan & WhatsApp Desktop (perangkat ini)" aria-label="Pengaturan perangkat"><i class="bi bi-sliders"></i></button>
@@ -1218,7 +1219,7 @@ function renderFoTable() {
             // v6.4: sudah diverifikasi (Proses/Pending/Selesai) → menu Detail
             if (!waiting && r.Status !== 'Terlewat' && r.LayananID) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${r.LayananID}')"><i class="bi bi-eye"></i> Detail</button>`;
             // v6.9: layanan Selesai → panggil pemohon mengambil berkas di PTSP
-            if (st.label === 'Selesai' && r.LayananID) aksi += `<button class="btn btn-labuku-accent btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${r.LayananID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>`;
+            if (st.label === 'Selesai' && r.LayananID) aksi += `<button class="btn btn-ambil-berkas btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${r.LayananID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>`;
           }
           return `
           <tr class="${r.Status === 'Di Loket' ? 'queue-highlight' : ''} ${r._temp ? 'fo-row-pending' : ''}">
@@ -1326,6 +1327,32 @@ function panggilAmbil(layananId) {
     if (!r.Nomor) umumkan({ Nomor: res.data.nomor, PemohonNama: res.data.nama, LayananNama: res.data.layanan });
     showToast('Berhasil', 'Panggilan ambil berkas' + ((r.Nomor || res.data.nomor) ? ' nomor ' + (r.Nomor || res.data.nomor) : '') + ' dikirim.', 'success');
   }, err => showToast('Error', err.message || String(err), 'danger')).panggilAmbilBerkas(layananId, kunci);
+}
+
+/**
+ * v6.10: tombol "Selamat Datang" — pengunjung baru masuk: monitor menampilkan sapaan + tutorial ambil antrean
+ * mandiri (45 detik) dan speaker menyapa. Optimistic: suara & monitor seketika, server mencatat di latar belakang
+ * agar monitor di komputer lain ikut tampil.
+ */
+const SAPA_DETIK = 45;
+function kalimatSapa_(cfg) {
+  cfg = cfg || suaraCfg_();
+  return String(cfg.suara_sapa || SUARA_BAWAAN.suara_sapa).replace(/\{instansi\}/g, instansiNama()).replace(/\s+/g, ' ').trim();
+}
+function umumkanSapa_(cfgUji) {
+  if (!cfgUji && !suaraAktif_()) return;
+  const cfg = cfgUji || suaraCfg_();
+  const teks = kalimatSapa_(cfg);
+  window._panggilanTerakhir = teks;
+  bunyiBel_(cfg.suara_bel, suaraPerangkat_().vol, () => ucapkan_(teks, 1));
+}
+function sapaPengunjungFo() {
+  const kunci = 'SAPA-' + Date.now();
+  umumkanSapa_();
+  kirimKeMonitor_({ tipe: 'sapa', id: kunci, detik: SAPA_DETIK });
+  showToast('Selamat Datang', 'Sapaan & cara ambil antrean tampil di monitor selama ' + SAPA_DETIK + ' detik.', 'success');
+  gsr(res => { if (!res || !res.success) showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); },
+    err => showToast('Error', err.message || String(err), 'danger')).sapaPengunjung(kunci);
 }
 
 function terlewatFo(id) {
@@ -1495,7 +1522,8 @@ function lewatiWaMassal() {
    Jenis suara, kecepatan, nada & volume: per perangkat (localStorage). */
 const ANGKA_UCAP = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
 const SUARA_BAWAAN = { suara_kalimat: 'Nomor antrean, {nomor}, atas nama {nama}, silakan menuju {tujuan}.', suara_tujuan: 'loket', suara_bel: 'dingdong', suara_ulang: '1',
-  suara_kalimat_ambil: 'Nomor antrean, {nomor}, atas nama {nama}, berkas {layanan} sudah selesai. Silakan ambil di {tujuan}.', suara_tujuan_ambil: 'meja PTSP' }; // v6.9: ambil berkas
+  suara_kalimat_ambil: 'Nomor antrean, {nomor}, atas nama {nama}, berkas {layanan} sudah selesai. Silakan ambil di {tujuan}.', suara_tujuan_ambil: 'meja PTSP', // v6.9: ambil berkas
+  suara_sapa: 'Selamat datang di {instansi}. Silakan ambil nomor antrean secara mandiri. Pertama, pindai kode QR di layar dengan kamera HP. Kedua, isi NIK, nama, nomor WhatsApp, dan alamat, lalu pilih layanan. Ketiga, simpan nomor antrean Anda, lalu tunggu sampai nomor Anda dipanggil. Terima kasih.' }; // v6.10
 const BEL_INFO = [['dingdong', 'Ding-dong (2 nada)'], ['tiga', 'Pengumuman (3 nada naik)'], ['empat', 'Bandara (4 nada)'], ['ting', 'Ting (1 nada)'], ['tanpa', 'Tanpa bel']];
 const SUARA_PH = ['nomor', 'nama', 'layanan', 'tujuan', 'instansi'];
 function suaraAktif_() { return lsGet('labuku_suara') !== '0'; }
@@ -2291,7 +2319,7 @@ function renderBoTable() {
             <td class="kr-meta2">${l.ASNNama ? escapeHtml(l.ASNNama) : '<span class="text-secondary small">Belum diambil</span>'}</td>
             <td style="text-align:right;white-space:nowrap;">
               <button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${l.ID}')"><i class="bi bi-card-list"></i> Detail</button>
-              ${t.label === 'Selesai' ? `<button class="btn btn-labuku-accent btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${l.ID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>` : ''}
+              ${t.label === 'Selesai' ? `<button class="btn btn-ambil-berkas btn-sm-pill btn-ambil" title="Panggil pemohon mengambil berkas" onclick="panggilAmbil('${l.ID}')"><i class="bi bi-megaphone"></i> Panggil Ambil</button>` : ''}
               <button class="btn ${t.label === 'Selesai' ? 'btn-labuku-outline' : 'btn-labuku-primary'} btn-sm-pill" onclick="openWorkspace('${l.ID}')">${t.label === 'Selesai' ? 'Buka' : 'Kerjakan'}</button></td>
           </tr>`;
         }).join('')}
@@ -2382,7 +2410,7 @@ function renderWorkspaceTab(tab) {
   else target.innerHTML = buildWorkspaceIsianTab(d);
   // v6.9: layanan Selesai → tombol panggil ambil berkas di kepala workspace (tampil di semua tab)
   const slot = document.getElementById('wsAmbilSlot');
-  if (slot) slot.innerHTML = d.layanan.Status === 'Selesai' ? `<button class="btn btn-labuku-primary btn-ambil" onclick="panggilAmbil('${escapeHtml(d.layanan.ID)}')"><i class="bi bi-megaphone"></i> Panggil Ambil Berkas</button>` : '';
+  if (slot) slot.innerHTML = d.layanan.Status === 'Selesai' ? `<button class="btn btn-ambil-berkas btn-ambil" onclick="panggilAmbil('${escapeHtml(d.layanan.ID)}')"><i class="bi bi-megaphone"></i> Panggil Ambil Berkas</button>` : '';
 }
 
 /* ---------- v6.2: Petunjuk Teknis (teks per layanan) di panel samping ---------- */
@@ -3709,9 +3737,18 @@ function loadManajemenSuara() {
       </div>
       <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
       <div class="wa-preview" id="suaraPratinjauAmbil"></div>
+      <hr class="my-4">
+      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+        <div><h6 class="fw-bold mb-1">Kalimat sapaan "Selamat Datang"</h6><div class="small text-secondary mb-2">Diucapkan setelah bel saat petugas menekan <b>Selamat Datang</b> di Front Office. Monitor menampilkan cara ambil antrean selama ${SAPA_DETIK} detik. Penanda: {instansi}.</div></div>
+        <button class="btn btn-link btn-sm p-0" onclick="resetSuaraKalimat('sapa')">Kembalikan bawaan</button>
+      </div>
+      <textarea class="form-control" rows="4" maxlength="600" id="suaraSapa" oninput="pratinjauSuara()">${escapeHtml(c.suara_sapa)}</textarea>
+      <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
+      <div class="wa-preview" id="suaraPratinjauSapa"></div>
       <div class="d-flex gap-2 flex-wrap mt-3">
         <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan()"><i class="bi bi-volume-up"></i> Coba suara</button>
         <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan('ambil')"><i class="bi bi-megaphone"></i> Coba ambil berkas</button>
+        <button class="btn btn-labuku-outline" onclick="umumkanSapa_(Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()))"><i class="bi bi-emoji-smile"></i> Coba sapaan</button>
         <button class="btn btn-labuku-primary" id="suaraSimpanBtn" onclick="simpanSuara()"><i class="bi bi-save"></i> Simpan</button>
       </div>
       <div class="small text-secondary mt-2">Jenis suara, kecepatan, nada & volume diatur di tiap komputer: Front Office → ikon pengatur.</div>
@@ -3725,7 +3762,8 @@ function bacaFormSuara_() {
     suara_bel: document.getElementById('suaraBel').value,
     suara_ulang: document.getElementById('suaraUlang').value,
     suara_kalimat_ambil: document.getElementById('suaraKalimatAmbil').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim(),
-    suara_tujuan_ambil: document.getElementById('suaraTujuanAmbil').value.replace(/\s+/g, ' ').trim()
+    suara_tujuan_ambil: document.getElementById('suaraTujuanAmbil').value.replace(/\s+/g, ' ').trim(),
+    suara_sapa: document.getElementById('suaraSapa').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim()
   };
 }
 function pratinjauSuara() {
@@ -3733,6 +3771,8 @@ function pratinjauSuara() {
   if (el) el.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
   const elA = document.getElementById('suaraPratinjauAmbil');
   if (elA) elA.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()), 'ambil');
+  const elS = document.getElementById('suaraPratinjauSapa');
+  if (elS) elS.textContent = kalimatSapa_(Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
 }
 function sisipSuaraPh(ph, targetId) {
   const ta = document.getElementById(targetId || 'suaraKalimat');
@@ -3745,6 +3785,7 @@ function sisipSuaraPh(ph, targetId) {
 }
 function resetSuaraKalimat(jenis) {
   if (jenis === 'ambil') document.getElementById('suaraKalimatAmbil').value = SUARA_BAWAAN.suara_kalimat_ambil;
+  else if (jenis === 'sapa') document.getElementById('suaraSapa').value = SUARA_BAWAAN.suara_sapa;
   else document.getElementById('suaraKalimat').value = SUARA_BAWAAN.suara_kalimat;
   pratinjauSuara();
 }
@@ -3755,6 +3796,7 @@ function simpanSuara() {
   if (!obj.suara_tujuan) obj.suara_tujuan = SUARA_BAWAAN.suara_tujuan;
   if (!obj.suara_kalimat_ambil) obj.suara_kalimat_ambil = SUARA_BAWAAN.suara_kalimat_ambil; // v6.9
   if (!obj.suara_tujuan_ambil) obj.suara_tujuan_ambil = SUARA_BAWAAN.suara_tujuan_ambil;
+  if (!obj.suara_sapa) obj.suara_sapa = SUARA_BAWAAN.suara_sapa; // v6.10
   const btn = document.getElementById('suaraSimpanBtn');
   btn.disabled = true;
   gsr(res => {
@@ -3770,10 +3812,10 @@ function simpanSuara() {
 /* ---------- v6.8 Tab: Monitor (isi layar monitor antrean — berlaku untuk semua layar) ---------- */
 const MONITOR_BAWAAN = {
   judul: '', sub: 'Silakan menunggu nomor antrean Anda dipanggil', teks: 'Selamat datang di {instansi}.', nama: 'samar', berikut: 5, kecepatan: 'sedang', tema: 'hijau', slideDetik: 8, slide: [],
-  tampil: { jam: true, berikutnya: true, riwayat: true, qr: true, ringkasan: true, slide: false, teks: true, layanan: true }
+  tampil: { jam: true, berikutnya: true, riwayat: true, qr: true, ringkasan: true, slide: false, teks: true, layanan: true, daftar: true }
 };
 const MONITOR_BAGIAN = [['jam', 'Jam & tanggal'], ['berikutnya', 'Daftar berikutnya'], ['riwayat', 'Riwayat panggilan (3 terakhir)'], ['qr', 'QR ambil antrean'],
-  ['ringkasan', 'Ringkasan hari ini'], ['layanan', 'Nama layanan'], ['teks', 'Teks berjalan'], ['slide', 'Slide gambar info']];
+  ['ringkasan', 'Ringkasan hari ini'], ['layanan', 'Nama layanan'], ['teks', 'Teks berjalan'], ['slide', 'Slide gambar info'], ['daftar', 'Daftar layanan KUA (bergulir)']];
 function monitorCfg_() {
   const m = (window.AppState.config && window.AppState.config.monitor) || {};
   return Object.assign({}, MONITOR_BAWAAN, m, { tampil: Object.assign({}, MONITOR_BAWAAN.tampil, m.tampil || {}) });

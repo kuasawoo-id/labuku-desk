@@ -106,6 +106,82 @@
     .L-strip .jam-strip { display: flex; }
     .jam-strip { display: none; flex-direction: column; justify-content: center; text-align: right; }
     .jam-strip b { font-size: calc(var(--u) * 3); }
+    /* v6.10: kartu "Layanan KUA" bergulir (kolom kanan) */
+    .ada-daftar #mBerikutBox { flex: 0 0 auto !important; }
+    .layanan-kartu { flex: 1; display: flex; flex-direction: column; min-height: calc(var(--u) * 8); }
+    .gulir { flex: 1; min-height: 0; overflow: hidden; margin-top: calc(var(--u) * .6); -webkit-mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%); mask-image: linear-gradient(to bottom, transparent 0, #000 7%, #000 93%, transparent 100%); }
+    .gulir-isi.gerak { animation: gulirY linear infinite; }
+    @keyframes gulirY { from { transform: translateY(0); } to { transform: translateY(-50%); } }
+    .lk-salinan { padding-bottom: calc(var(--u) * 1.2); }
+    .lk-kat { color: var(--aksen); font-weight: 800; text-transform: uppercase; letter-spacing: .08em; font-size: calc(var(--u) * 1.05); margin: calc(var(--u) * .9) 0 calc(var(--u) * .3); }
+    .lk-item { display: flex; gap: calc(var(--u) * .6); font-size: calc(var(--u) * 1.45); line-height: 1.3; padding: calc(var(--u) * .22) 0; }
+    .lk-item::before { content: ''; flex: 0 0 auto; width: calc(var(--u) * .45); height: calc(var(--u) * .45); border-radius: 50%; background: var(--aksen); margin-top: calc(var(--u) * .62); }
+    .L-strip #mLayananBox { display: none !important; }
+    /* ruang untuk daftar: Berikutnya maks. 3 baris; ringkasan & QR berdampingan di bawah */
+    .ada-daftar #mBerikut .baris:nth-child(n+4) { display: none; }
+    .ada-daftar .baris b { font-size: calc(var(--u) * 2.2); }
+    .ada-daftar .daftar { gap: calc(var(--u) * .5); margin-top: calc(var(--u) * .6); }
+    .L-lebar .kol-samping.ada-daftar, .L-tegak .kol-samping.ada-daftar { display: grid; grid-template-columns: 1fr auto; grid-template-rows: auto minmax(0, 1fr) auto; }
+    .ada-daftar #mBerikutBox { grid-column: 1 / -1; grid-row: 1; }
+    .ada-daftar #mLayananBox { grid-column: 1 / -1; grid-row: 2; }
+    .ada-daftar .ringkas-kartu { grid-column: 1; grid-row: 3; }
+    .ada-daftar .qr { grid-column: 2; grid-row: 3; }
+    .ada-daftar .ringkas-kartu { flex-wrap: nowrap; flex-direction: row; }
+    .ada-daftar .ringkas-kartu .chip { display: flex; flex-direction: column; justify-content: center; }
+    .ada-daftar .qr { flex-direction: column; justify-content: center; gap: calc(var(--u) * .5); padding: calc(var(--u) * 1); text-align: center; }
+    .ada-daftar .qr .kode img, .ada-daftar .qr .kode canvas { width: calc(var(--u) * 8.5); height: calc(var(--u) * 8.5); }
+    .ada-daftar .qr p { font-size: calc(var(--u) * 1.1); }
+    .ada-daftar .qr p small { display: none; }
+    /* v6.10: layar SAPAAN "Selamat Datang" + cara ambil antrean mandiri */
+    #mSapa { position: absolute; inset: 0; z-index: 8; display: none; flex-direction: column; background: radial-gradient(120% 120% at 20% 10%, var(--bg2), var(--bg)); padding: calc(var(--u) * 2.2) calc(var(--u) * 3); gap: calc(var(--u) * 1.6); color: var(--teks); }
+    #mSapa.tampil { display: flex; animation: sapaMasuk .6s ease-out; }
+    @keyframes sapaMasuk { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
+    .sapa-kepala { text-align: center; }
+    .sapa-kepala .sapa-label { color: var(--aksen); font-weight: 800; letter-spacing: .3em; font-size: calc(var(--u) * 2); }
+    .sapa-kepala h1 { margin: calc(var(--u) * .3) 0 0; font-size: calc(var(--u) * 5); font-weight: 800; line-height: 1.05; }
+    .sapa-kepala p { margin: calc(var(--u) * .6) 0 0; font-size: calc(var(--u) * 1.8); color: var(--teks2); }
+    .sapa-isi { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 2.4); align-items: stretch; }
+    .sapa-qr { background: #fff; color: #1B4332; border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.4); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * .8); box-shadow: 0 0 0 calc(var(--u) * .5) var(--aksen); }
+    .sapa-qr .kode { line-height: 0; }
+    .sapa-qr .kode img, .sapa-qr .kode canvas { width: calc(var(--u) * 22); height: calc(var(--u) * 22); }
+    .sapa-qr b { font-size: calc(var(--u) * 1.8); letter-spacing: .04em; }
+    .sapa-langkah { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1.4); }
+    .langkah { position: relative; background: var(--kartu); border: calc(var(--u) * .2) solid var(--garis); border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.4); display: flex; flex-direction: column; align-items: center; text-align: center; transition: transform .4s, border-color .4s, background .4s; min-height: 0; }
+    .langkah.aktif { border-color: var(--aksen); transform: translateY(calc(var(--u) * -.6)); background: color-mix(in srgb, var(--aksen) 14%, transparent); }
+    .langkah .no { position: absolute; top: calc(var(--u) * -1.2); left: 50%; transform: translateX(-50%); width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); border-radius: 50%; background: var(--aksen); color: var(--aksen-teks); font-weight: 800; font-size: calc(var(--u) * 1.9); display: flex; align-items: center; justify-content: center; }
+    .langkah .ilus { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: calc(var(--u) * 1.4); }
+    .langkah .ilus svg { height: 100%; max-height: calc(var(--u) * 16); width: auto; }
+    .langkah .teks-l { display: flex; flex-direction: column; align-items: center; }
+    .langkah b { font-size: calc(var(--u) * 2); margin-top: calc(var(--u) * .8); }
+    .langkah span { font-size: calc(var(--u) * 1.3); color: var(--teks2); margin-top: calc(var(--u) * .3); }
+    .sapa-kaki { display: flex; align-items: center; gap: calc(var(--u) * 1.4); font-size: calc(var(--u) * 1.2); color: var(--teks2); }
+    .sapa-bar { flex: 1; height: calc(var(--u) * .5); border-radius: 999px; background: var(--garis); overflow: hidden; }
+    .sapa-bar i { display: block; height: 100%; width: 100%; background: var(--aksen); }
+    .pindai { animation: pindai 2s ease-in-out infinite; }
+    @keyframes pindai { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(52px); } }
+    .kedip-tik { animation: kedipTik 1.6s ease-in-out infinite; }
+    @keyframes kedipTik { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
+    .L-tegak #mSapa { padding: calc(var(--u) * 2.4) calc(var(--u) * 2); }
+    .L-tegak .sapa-isi { grid-template-columns: 1fr; grid-template-rows: auto 1fr; justify-items: center; }
+    .L-tegak .sapa-langkah { grid-template-columns: 1fr; width: 100%; }
+    .L-tegak .langkah { flex-direction: row; text-align: left; gap: calc(var(--u) * 1.4); }
+    .L-tegak .langkah .ilus { flex: 0 0 calc(var(--u) * 11); height: calc(var(--u) * 11); margin: 0; }
+    .L-tegak .langkah .no { left: calc(var(--u) * -.6); top: calc(var(--u) * -.6); transform: none; }
+    .L-tegak .langkah .teks-l { align-items: flex-start; }
+    .L-tegak .langkah b { margin-top: 0; }
+    .L-strip #mSapa { flex-direction: row; align-items: center; padding: calc(var(--u) * .6) calc(var(--u) * 1.4); gap: calc(var(--u) * 1.4); }
+    .L-strip .sapa-kepala { text-align: left; flex: 0 0 auto; }
+    .L-strip .sapa-kepala .sapa-label { font-size: calc(var(--u) * 1); }
+    .L-strip .sapa-kepala h1 { font-size: calc(var(--u) * 2.6); }
+    .L-strip .sapa-kepala p, .L-strip .sapa-kaki, .L-strip .langkah .ilus, .L-strip .langkah span { display: none; }
+    .L-strip .sapa-isi { grid-template-columns: auto 1fr; gap: calc(var(--u) * 1.2); align-items: center; }
+    .L-strip .sapa-qr { padding: calc(var(--u) * .4); box-shadow: none; flex-direction: row; }
+    .L-strip .sapa-qr .kode img, .L-strip .sapa-qr .kode canvas { width: calc(var(--u) * 7.5); height: calc(var(--u) * 7.5); }
+    .L-strip .sapa-qr b { display: none; }
+    .L-strip .langkah { padding: calc(var(--u) * .6) calc(var(--u) * .8) calc(var(--u) * .6) calc(var(--u) * 3.4); }
+    .L-strip .langkah .no { top: 50%; left: calc(var(--u) * .5); transform: translateY(-50%); width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); font-size: calc(var(--u) * 1.3); }
+    .L-strip .langkah b { margin: 0; font-size: calc(var(--u) * 1.6); }
+    .L-strip .langkah.aktif { transform: none; }
     .sembunyi { display: none !important; }
     /* Status koneksi & pengaturan layar */
     #status { position: absolute; right: calc(var(--u) * .6); bottom: calc(var(--u) * .4); width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; opacity: .5; z-index: 5; }
@@ -151,14 +227,28 @@
         <div class="kartu riwayat-kartu" id="mRiwayatBox"><div class="riwayat"><span class="label">Sebelumnya</span><span id="mRiwayat"></span></div></div>
         <div class="kartu slide-kartu slide" id="mSlide"></div>
       </section>
-      <section class="kol kol-samping">
+      <section class="kol kol-samping" id="mKolSamping">
         <div class="kartu berikut-kartu" id="mBerikutBox" style="flex:1;"><div class="label">Berikutnya</div><div class="daftar" id="mBerikut"></div></div>
+        <div class="kartu layanan-kartu sembunyi" id="mLayananBox"><div class="label">Layanan KUA</div><div class="gulir" id="mGulir"><div class="gulir-isi" id="mGulirIsi"></div></div></div>
         <div class="chip-row ringkas-kartu" id="mRingkas"></div>
         <div class="kartu qr" id="mQrBox"><div class="kode" id="mQr"></div><p>Ambil nomor antrean<small>Scan QR dengan kamera HP</small></p></div>
         <div class="jam-strip" id="mJamStrip"><b id="mJam2">--:--</b></div>
       </section>
     </main>
     <footer class="jalan" id="mJalan"><span id="mJalanTeks"></span></footer>
+    <!-- v6.10: layar sapaan "Selamat Datang" + cara ambil antrean mandiri (tombol di Front Office) -->
+    <div id="mSapa" aria-live="polite">
+      <div class="sapa-kepala"><div class="sapa-label">SELAMAT DATANG</div><h1 id="sInstansi">KUA</h1><p>Ambil nomor antrean sendiri, cukup 3 langkah mudah</p></div>
+      <div class="sapa-isi">
+        <div class="sapa-qr"><div class="kode" id="sQr"></div><b>PINDAI DI SINI</b></div>
+        <div class="sapa-langkah">
+          <div class="langkah" data-i="0"><div class="no">1</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><g fill="#fff"><rect x="54" y="38" width="52" height="52" rx="4"/></g><g fill="#1B4332"><rect x="58" y="42" width="14" height="14"/><rect x="88" y="42" width="14" height="14"/><rect x="58" y="72" width="14" height="14"/><rect x="61" y="45" width="8" height="8" fill="#fff"/><rect x="91" y="45" width="8" height="8" fill="#fff"/><rect x="61" y="75" width="8" height="8" fill="#fff"/><rect x="77" y="44" width="6" height="6"/><rect x="77" y="58" width="6" height="6"/><rect x="85" y="64" width="6" height="6"/><rect x="95" y="74" width="7" height="7"/><rect x="78" y="78" width="7" height="7"/><rect x="88" y="84" width="5" height="5"/></g><path d="M50 34 h10 M50 34 v10 M110 34 h-10 M110 34 v10 M50 94 h10 M50 94 v-10 M110 94 h-10 M110 94 v-10" stroke="#D4A017" stroke-width="4" stroke-linecap="round" fill="none"/><rect class="pindai" x="50" y="38" width="60" height="4" rx="2" fill="#D4A017"/><rect x="56" y="108" width="48" height="10" rx="5" fill="#D4A017"/><rect x="62" y="126" width="36" height="6" rx="3" fill="currentColor" opacity=".5"/></svg></div><div class="teks-l"><b>Pindai QR</b><span>Buka kamera HP, arahkan ke kode QR, lalu ketuk tautan yang muncul</span></div></div>
+          <div class="langkah" data-i="1"><div class="no">2</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><rect x="54" y="34" width="26" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="43" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="58" y="47" width="22" height="4" rx="2" fill="#D4A017" class="kedip-tik"/><rect x="54" y="62" width="34" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="71" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="54" y="90" width="24" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="99" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M96 103 l4 4 l4 -4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="54" y="120" width="52" height="14" rx="7" fill="#D4A017"/><path d="M73 127 l5 4 l9 -8" stroke="#1B4332" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="teks-l"><b>Isi data</b><span>Isi NIK, nama, nomor WhatsApp &amp; alamat, pilih layanan, lalu tekan Ambil Nomor Antrean</span></div></div>
+          <div class="langkah" data-i="2"><div class="no">3</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><path d="M20 50 h120 a6 6 0 0 1 6 6 v12 a12 12 0 0 0 0 24 v12 a6 6 0 0 1 -6 6 h-120 a6 6 0 0 1 -6 -6 v-12 a12 12 0 0 0 0 -24 v-12 a6 6 0 0 1 6 -6 z" fill="#D4A017"/><line x1="44" y1="58" x2="44" y2="102" stroke="#1B4332" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/><text x="91" y="88" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="22" fill="#1B4332">A-001</text><path d="M24 74 h5 l7 -6 v24 l-7 -6 h-5 z" fill="#1B4332"/><g stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" class="kedip-tik"><path d="M112 32 q10 -10 22 -4"/><path d="M118 42 q8 -6 16 -2"/><path d="M48 128 q-10 10 -22 4"/><path d="M42 118 q-8 6 -16 2"/></g></svg></div><div class="teks-l"><b>Tunggu dipanggil</b><span>Simpan nomor antrean Anda, duduk, dan dengarkan panggilan</span></div></div>
+        </div>
+      </div>
+      <div class="sapa-kaki"><span>Kembali ke layar antrean dalam <b id="sSisa">45</b> detik</span><div class="sapa-bar"><i id="sBar"></i></div></div>
+    </div>
     <div id="status" title="Koneksi"></div>
   </div>
 
@@ -235,6 +325,7 @@
       u = u * (Number(s.skala) || 100) / 100;
       st.style.setProperty('--u', Math.max(3, u).toFixed(2) + 'px');
       aturJalan();
+      if (D) { render(); if (el('mKolSamping').classList.contains('ada-daftar')) aturDaftar(D.daftarLayanan, true); } // v6.10: tata letak berubah → atur ulang daftar bergulir
     }
     window.addEventListener('resize', terapkanLayar);
 
@@ -299,6 +390,63 @@
       } catch (e) {}
     }
 
+    /* ---------- v6.10: layar sapaan "Selamat Datang" (45 detik) ---------- */
+    var sapaTerakhir = null, sapaTimer = null, sapaDetikT = null, sapaLangkahT = null, sapaQr = false;
+    function ucapSapa() {
+      if (!layar().suara || !window.speechSynthesis) return;
+      var cfg = (D && D.suara) || {};
+      var kal = String(cfg.suara_sapa || 'Selamat datang di {instansi}. Silakan ambil nomor antrean dengan memindai kode QR di layar.').replace(/\{instansi\}/g, (D && D.instansi) || 'KUA');
+      window.__ucapMonitor = kal;
+      try { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(kal); u.lang = 'id-ID'; u.rate = 0.9; window.speechSynthesis.speak(u); } catch (e) {}
+    }
+    function tampilSapa(id, detik, bersuara) {
+      if (!id || id === sapaTerakhir) return;
+      sapaTerakhir = id;
+      detik = Math.max(5, Math.min(120, Math.round(Number(detik) || 45)));
+      teks('sInstansi', (D && ((D.monitor && D.monitor.judul) || D.instansi)) || 'KUA');
+      if (!sapaQr && typeof QRCode !== 'undefined') {
+        try { new QRCode(el('sQr'), { text: new URL('antrean.html', location.href).href, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M }); sapaQr = true; } catch (e) {}
+      }
+      el('mSapa').classList.add('tampil');
+      var bar = el('sBar'); bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
+      bar.style.transition = 'width ' + detik + 's linear'; bar.style.width = '0%';
+      var akhir = Date.now() + detik * 1000;
+      clearInterval(sapaDetikT); teks('sSisa', detik);
+      sapaDetikT = setInterval(function () { teks('sSisa', Math.max(0, Math.ceil((akhir - Date.now()) / 1000))); }, 500);
+      var ls = document.querySelectorAll('#mSapa .langkah'), i = 0;
+      var geser = function () { ls.forEach(function (x, k) { x.classList.toggle('aktif', k === i % ls.length); }); i++; };
+      clearInterval(sapaLangkahT); geser(); sapaLangkahT = setInterval(geser, 5000);
+      clearTimeout(sapaTimer); sapaTimer = setTimeout(tutupSapa, detik * 1000);
+      if (bersuara) ucapSapa();
+    }
+    function tutupSapa() {
+      clearTimeout(sapaTimer); clearInterval(sapaDetikT); clearInterval(sapaLangkahT);
+      el('mSapa').classList.remove('tampil');
+    }
+    window.__tutupSapa = tutupSapa;
+
+    /* ---------- v6.10: kartu "Layanan KUA" — daftar layanan aktif bergulir terus ---------- */
+    var daftarKunci = '';
+    function aturDaftar(daftar, paksa) {
+      var gulir = el('mGulir'), isi = el('mGulirIsi');
+      if (!gulir || !isi) return;
+      var kunci = JSON.stringify(daftar) + '|' + gulir.clientHeight;
+      if (!paksa && kunci === daftarKunci) return;
+      daftarKunci = kunci;
+      var html = '<div class="lk-salinan">' + daftar.map(function (g) {
+        return '<div class="lk-kat">' + esc(g.kategori) + '</div>' + (g.layanan || []).map(function (n) { return '<div class="lk-item">' + esc(n) + '</div>'; }).join('');
+      }).join('') + '</div>';
+      isi.classList.remove('gerak'); isi.style.animationDuration = '';
+      isi.innerHTML = html;
+      var tinggi = isi.scrollHeight;
+      if (tinggi > gulir.clientHeight + 4) {
+        isi.innerHTML = html + html; // dua salinan → putaran tanpa sambungan
+        var u = parseFloat(getComputedStyle(el('stage')).getPropertyValue('--u')) || 10;
+        isi.style.animationDuration = Math.max(10, Math.round(tinggi / (u * 1.3))) + 's';
+        isi.classList.add('gerak');
+      }
+    }
+
     /* ---------- Tampilkan data ---------- */
     function render() {
       if (!D) return;
@@ -317,14 +465,21 @@
       teks('mNama', s ? s.nama : ''); tampil('mNama', !!(s && s.nama));
       teks('mLay', s ? s.layanan : ''); tampil('mLay', !!(s && s.layanan && t.layanan !== false));
       if (s && s.id !== idSekarang) {
+        if (!pertama) tutupSapa(); // v6.10: panggilan baru menutup layar sapaan
         if (!pertama) { var p = el('mPanggil'); p.classList.remove('baru'); void p.offsetWidth; p.classList.add('baru'); ucapPanggilan(s); }
         idSekarang = s.id;
       }
+      if (D.sapa && D.sapa.id) tampilSapa(D.sapa.id, D.sapa.sisa, !pertama); // v6.10: sapaan dari loket mana pun
       pertama = false;
       el('mBerikut').innerHTML = (D.berikut || []).length ? D.berikut.map(function (b) {
         return '<div class="baris"><b>' + esc(b.nomor) + '</b><span>' + esc([b.nama, t.layanan !== false ? b.layanan : ''].filter(Boolean).join(' · ')) + '</span></div>';
       }).join('') : '<div class="kosong">Tidak ada antrean menunggu</div>';
-      tampil('mBerikutBox', t.berikutnya !== false);
+      // v6.10: daftar layanan KUA; saat tidak ada antrean menunggu, kartu ini mengambil ruang "Berikutnya"
+      var daftar = t.daftar !== false && layar().tata !== 'strip' ? (D.daftarLayanan || []) : []; // strip: tidak muat
+      el('mKolSamping').classList.toggle('ada-daftar', daftar.length > 0);
+      tampil('mLayananBox', daftar.length > 0);
+      tampil('mBerikutBox', t.berikutnya !== false && !(daftar.length && !(D.berikut || []).length));
+      if (daftar.length) aturDaftar(daftar);
       el('mRiwayat').innerHTML = (D.riwayat || []).map(function (r) { return '<b' + (r.jenis === 'ambil' ? ' class="ambil"' : '') + '>' + esc(r.nomor) + '</b>'; }).join('') || '<span class="kosong" style="margin:0">–</span>';
       tampil('mRiwayatBox', t.riwayat !== false);
       var rk = D.ringkasan || {};
@@ -369,6 +524,7 @@
           D.berikut = (D.berikut || []).filter(function (b) { return b.id !== r.ID; });
           render();
         }
+        if (m.tipe === 'sapa' && m.id) tampilSapa(m.id, m.detik, true); // v6.10
         clearTimeout(segarJeda); segarJeda = setTimeout(tarik, 1500);
       };
     } catch (e) {}

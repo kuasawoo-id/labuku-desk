@@ -805,3 +805,15 @@ table.lb-table tbody td { padding: .9rem 1.1rem; }
 .wa-massal-item.aktif { background: color-mix(in srgb, var(--accent) 12%, var(--bg-card)); }
 .ptsp-ticket-num-kecil { font-size: 1.8rem; margin-top: .75rem; }
 #foWaMassalN { font-size: .72rem; vertical-align: middle; }
+
+/* v6.10: tombol Panggil Ambil Berkas — garis biru berbentuk pil (beda dari Verifikasi yang emas) */
+.btn-ambil-berkas { --ab: #1d5fbf; border: 1.5px solid var(--ab); color: var(--ab); background: transparent; border-radius: 999px; font-weight: 600; }
+.btn-ambil-berkas:hover, .btn-ambil-berkas:focus-visible { background: var(--ab); border-color: var(--ab); color: #fff; }
+[data-theme="dark"] .btn-ambil-berkas { --ab: #7fb0ff; }
+[data-theme="dark"] .btn-ambil-berkas:hover { color: #0d1b2a; }
+#wsAmbilSlot .btn-ambil-berkas { padding: .5rem 1.1rem; }
+/* v6.10: tombol "Selamat Datang" di HP cukup ikon, supaya baris tombol Front Office tetap satu baris */
+@media (max-width: 767.98px) {
+  #foSapaBtn .label-hp { display: none; }
+  #foSapaBtn { flex: 0 0 auto !important; }
+}
