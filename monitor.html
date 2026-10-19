@@ -132,56 +132,175 @@
     .ada-daftar .qr .kode img, .ada-daftar .qr .kode canvas { width: calc(var(--u) * 8.5); height: calc(var(--u) * 8.5); }
     .ada-daftar .qr p { font-size: calc(var(--u) * 1.1); }
     .ada-daftar .qr p small { display: none; }
-    /* v6.10: layar SAPAAN "Selamat Datang" + cara ambil antrean mandiri */
-    #mSapa { position: absolute; inset: 0; z-index: 8; display: none; flex-direction: column; background: radial-gradient(120% 120% at 20% 10%, var(--bg2), var(--bg)); padding: calc(var(--u) * 2.2) calc(var(--u) * 3); gap: calc(var(--u) * 1.6); color: var(--teks); }
+    /* v6.11: layar SAPAAN 5 segmen (salam → pindai QR → isi data → tunggu → penutup); durasi mengikuti voice over */
+    #mSapa { position: absolute; inset: 0; z-index: 8; display: none; flex-direction: column; background: radial-gradient(120% 120% at 15% 0%, var(--bg2), var(--bg)); padding: calc(var(--u) * 1.4) calc(var(--u) * 2.4); gap: calc(var(--u) * 1); color: var(--teks); overflow: hidden; }
     #mSapa.tampil { display: flex; animation: sapaMasuk .6s ease-out; }
-    @keyframes sapaMasuk { from { opacity: 0; transform: scale(.98); } to { opacity: 1; transform: none; } }
-    .sapa-kepala { text-align: center; }
-    .sapa-kepala .sapa-label { color: var(--aksen); font-weight: 800; letter-spacing: .3em; font-size: calc(var(--u) * 2); }
-    .sapa-kepala h1 { margin: calc(var(--u) * .3) 0 0; font-size: calc(var(--u) * 5); font-weight: 800; line-height: 1.05; }
-    .sapa-kepala p { margin: calc(var(--u) * .6) 0 0; font-size: calc(var(--u) * 1.8); color: var(--teks2); }
-    .sapa-isi { flex: 1; min-height: 0; display: grid; grid-template-columns: auto 1fr; gap: calc(var(--u) * 2.4); align-items: stretch; }
-    .sapa-qr { background: #fff; color: #1B4332; border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.4); display: flex; flex-direction: column; align-items: center; justify-content: center; gap: calc(var(--u) * .8); box-shadow: 0 0 0 calc(var(--u) * .5) var(--aksen); }
-    .sapa-qr .kode { line-height: 0; }
-    .sapa-qr .kode img, .sapa-qr .kode canvas { width: calc(var(--u) * 22); height: calc(var(--u) * 22); }
-    .sapa-qr b { font-size: calc(var(--u) * 1.8); letter-spacing: .04em; }
-    .sapa-langkah { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1.4); }
-    .langkah { position: relative; background: var(--kartu); border: calc(var(--u) * .2) solid var(--garis); border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.4); display: flex; flex-direction: column; align-items: center; text-align: center; transition: transform .4s, border-color .4s, background .4s; min-height: 0; }
-    .langkah.aktif { border-color: var(--aksen); transform: translateY(calc(var(--u) * -.6)); background: color-mix(in srgb, var(--aksen) 14%, transparent); }
-    .langkah .no { position: absolute; top: calc(var(--u) * -1.2); left: 50%; transform: translateX(-50%); width: calc(var(--u) * 3.2); height: calc(var(--u) * 3.2); border-radius: 50%; background: var(--aksen); color: var(--aksen-teks); font-weight: 800; font-size: calc(var(--u) * 1.9); display: flex; align-items: center; justify-content: center; }
-    .langkah .ilus { flex: 1; min-height: 0; width: 100%; display: flex; align-items: center; justify-content: center; margin-top: calc(var(--u) * 1.4); }
-    .langkah .ilus svg { height: 100%; max-height: calc(var(--u) * 16); width: auto; }
-    .langkah .teks-l { display: flex; flex-direction: column; align-items: center; }
-    .langkah b { font-size: calc(var(--u) * 2); margin-top: calc(var(--u) * .8); }
-    .langkah span { font-size: calc(var(--u) * 1.3); color: var(--teks2); margin-top: calc(var(--u) * .3); }
-    .sapa-kaki { display: flex; align-items: center; gap: calc(var(--u) * 1.4); font-size: calc(var(--u) * 1.2); color: var(--teks2); }
-    .sapa-bar { flex: 1; height: calc(var(--u) * .5); border-radius: 999px; background: var(--garis); overflow: hidden; }
-    .sapa-bar i { display: block; height: 100%; width: 100%; background: var(--aksen); }
+    @keyframes sapaMasuk { from { opacity: 0; transform: scale(.985); } to { opacity: 1; transform: none; } }
+    .sp-atas { display: flex; align-items: center; gap: calc(var(--u) * 2); }
+    .sp-merek { flex: 0 0 auto; display: flex; flex-direction: column; }
+    .sp-merek b { color: var(--aksen); letter-spacing: .28em; font-size: calc(var(--u) * 1.1); }
+    .sp-merek span { font-weight: 800; font-size: calc(var(--u) * 2.1); line-height: 1.1; }
+    .sp-tahap { flex: 1; display: grid; grid-template-columns: repeat(5, 1fr); gap: calc(var(--u) * .8); list-style: none; margin: 0; padding: 0; }
+    .sp-tahap li { display: flex; flex-direction: column; gap: calc(var(--u) * .45); font-size: calc(var(--u) * 1.05); font-weight: 700; color: var(--teks2); opacity: .55; transition: opacity .4s, color .4s; }
+    .sp-tahap li span { white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .sp-tahap li span::before { content: attr(data-no) '  '; color: var(--aksen); }
+    .sp-tahap li i { display: block; height: calc(var(--u) * .45); border-radius: 999px; background: var(--garis); overflow: hidden; }
+    .sp-tahap li i::after { content: ''; display: block; height: 100%; width: var(--isi, 0%); background: var(--aksen); border-radius: inherit; }
+    .sp-tahap li.aktif, .sp-tahap li.selesai { opacity: 1; color: var(--teks); }
+    .sp-tahap li.selesai i::after { width: 100%; }
+    .sp-panggung { position: relative; flex: 1; min-height: 0; }
+    .sp-adegan { position: absolute; inset: 0; display: grid; align-items: center; gap: calc(var(--u) * 2.4); opacity: 0; visibility: hidden; transform: translateX(calc(var(--u) * 3)); transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1), visibility 0s .7s; }
+    .sp-adegan.aktif { opacity: 1; visibility: visible; transform: none; transition: opacity .7s ease, transform .7s cubic-bezier(.2,.8,.2,1), visibility 0s; }
+    .sp-adegan.lewat { transform: translateX(calc(var(--u) * -3)); }
+    .sp-kaki { display: flex; align-items: center; gap: calc(var(--u) * 1.2); font-size: calc(var(--u) * 1.05); color: var(--teks2); }
+    .sapa-bar { flex: 1; height: calc(var(--u) * .45); border-radius: 999px; background: var(--garis); overflow: hidden; }
+    .sapa-bar i { display: block; height: 100%; width: 100%; background: var(--aksen); transition: width .1s linear; }
+    .sp-vo { white-space: nowrap; }
+    .sp-judul-adegan { font-size: calc(var(--u) * 3); font-weight: 800; line-height: 1.1; margin: 0; }
+    .sp-judul-adegan small { display: block; color: var(--aksen); font-size: .42em; letter-spacing: .2em; margin-bottom: calc(var(--u) * .4); }
+    .sp-sub { font-size: calc(var(--u) * 1.5); color: var(--teks2); margin: calc(var(--u) * .6) 0 0; }
+    /* daftar langkah di samping ilustrasi (yang sedang dijelaskan disorot) */
+    .sp-poin { list-style: none; margin: calc(var(--u) * 1.6) 0 0; padding: 0; display: flex; flex-direction: column; gap: calc(var(--u) * .7); }
+    .sp-poin li { display: flex; gap: calc(var(--u) * 1); align-items: flex-start; padding: calc(var(--u) * .7) calc(var(--u) * 1); border-radius: calc(var(--u) * 1); border: calc(var(--u) * .15) solid transparent; font-size: calc(var(--u) * 1.35); color: var(--teks2); transition: all .45s; }
+    .sp-poin li b { display: block; color: var(--teks); font-size: 1.12em; }
+    .sp-poin li em { font-style: normal; flex: 0 0 auto; width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); border-radius: 50%; background: var(--garis); color: var(--teks); display: flex; align-items: center; justify-content: center; font-weight: 800; font-size: calc(var(--u) * 1.2); transition: all .45s; }
+    .sp-poin li.aktif { background: color-mix(in srgb, var(--aksen) 16%, transparent); border-color: var(--aksen); color: var(--teks); transform: translateX(calc(var(--u) * .6)); }
+    .sp-poin li.aktif em, .sp-poin li.selesai em { background: var(--aksen); color: var(--aksen-teks); }
+    .sp-poin li.selesai em::before { content: '✓'; }
+    .sp-poin li.selesai em span { display: none; }
+    /* HP tiruan */
+    .sp-hp { position: relative; justify-self: center; width: calc(var(--u) * 19.5); height: calc(var(--u) * 38); border-radius: calc(var(--u) * 3); background: #0d1117; padding: calc(var(--u) * .8); box-shadow: 0 calc(var(--u) * 1.4) calc(var(--u) * 4) rgba(0,0,0,.45), inset 0 0 0 calc(var(--u) * .25) #303a46; transition: transform 1s cubic-bezier(.2,.8,.2,1); }
+    .sp-hp::before { content: ''; position: absolute; top: calc(var(--u) * .8); left: 50%; width: calc(var(--u) * 5.5); height: calc(var(--u) * 1.1); border-radius: 0 0 calc(var(--u) * .8) calc(var(--u) * .8); background: #0d1117; transform: translateX(-50%); z-index: 5; }
+    .sp-layar { position: relative; width: 100%; height: 100%; border-radius: calc(var(--u) * 2.3); overflow: hidden; background: #F9FAF6; color: #111827; }
+    .sp-jari { position: absolute; z-index: 6; width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: rgba(212,160,23,.55); box-shadow: 0 0 0 calc(var(--u) * .3) rgba(255,255,255,.8); opacity: 0; transform: scale(.4); transition: opacity .3s, transform .3s, left .6s, top .6s; pointer-events: none; }
+    .sp-jari.ketuk { opacity: 1; transform: scale(1); animation: ketuk .9s ease-out infinite; }
+    @keyframes ketuk { 0% { box-shadow: 0 0 0 0 rgba(212,160,23,.7); } 100% { box-shadow: 0 0 0 calc(var(--u) * 2) rgba(212,160,23,0); } }
+    /* Adegan 1 — salam */
+    .sp-salam { grid-template-columns: 1fr; grid-template-rows: auto 1fr; text-align: center; align-content: center; }
+    .sp-salam h1 { margin: 0; font-size: calc(var(--u) * 5.4); font-weight: 800; line-height: 1.05; }
+    .sp-salam h1 small { display: block; font-size: .36em; color: var(--aksen); letter-spacing: .3em; margin-bottom: calc(var(--u) * .6); }
+    .sp-tiga { display: grid; grid-template-columns: repeat(3, 1fr); gap: calc(var(--u) * 1.6); align-self: stretch; margin-top: calc(var(--u) * 1.6); }
+    .sp-kartu { position: relative; background: var(--kartu); border: calc(var(--u) * .2) solid var(--garis); border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 2.2) calc(var(--u) * 1.4) calc(var(--u) * 1.4); display: flex; flex-direction: column; align-items: center; justify-content: flex-end; min-height: 0; transition: border-color .4s, background .4s, transform .4s; }
+    .sp-kartu .no { position: absolute; top: calc(var(--u) * -1.4); width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; background: var(--aksen); color: var(--aksen-teks); font-weight: 800; font-size: calc(var(--u) * 1.7); display: flex; align-items: center; justify-content: center; }
+    .sp-kartu svg { flex: 1; min-height: 0; max-height: calc(var(--u) * 13); width: 100%; }
+    .sp-kartu b { font-size: calc(var(--u) * 2); margin-top: calc(var(--u) * .6); }
+    .sp-kartu span { font-size: calc(var(--u) * 1.25); color: var(--teks2); }
+    .aktif .sp-kartu { animation: naik .8s cubic-bezier(.2,.8,.2,1) both; }
+    .aktif .sp-kartu:nth-child(2) { animation-delay: .25s; } .aktif .sp-kartu:nth-child(3) { animation-delay: .5s; }
+    @keyframes naik { from { opacity: 0; transform: translateY(calc(var(--u) * 3)); } to { opacity: 1; transform: none; } }
+    .sp-kartu.sorot { border-color: var(--aksen); background: color-mix(in srgb, var(--aksen) 15%, transparent); }
     .pindai { animation: pindai 2s ease-in-out infinite; }
     @keyframes pindai { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(52px); } }
     .kedip-tik { animation: kedipTik 1.6s ease-in-out infinite; }
     @keyframes kedipTik { 0%, 100% { opacity: .25; } 50% { opacity: 1; } }
-    .L-tegak #mSapa { padding: calc(var(--u) * 2.4) calc(var(--u) * 2); }
-    .L-tegak .sapa-isi { grid-template-columns: 1fr; grid-template-rows: auto 1fr; justify-items: center; }
-    .L-tegak .sapa-langkah { grid-template-columns: 1fr; width: 100%; }
-    .L-tegak .langkah { flex-direction: row; text-align: left; gap: calc(var(--u) * 1.4); }
-    .L-tegak .langkah .ilus { flex: 0 0 calc(var(--u) * 11); height: calc(var(--u) * 11); margin: 0; }
-    .L-tegak .langkah .no { left: calc(var(--u) * -.6); top: calc(var(--u) * -.6); transform: none; }
-    .L-tegak .langkah .teks-l { align-items: flex-start; }
-    .L-tegak .langkah b { margin-top: 0; }
+    /* Adegan 2 — pindai QR */
+    .sp-qr-adegan { grid-template-columns: auto auto 1fr; }
+    .sp-qrbox { position: relative; background: #fff; border-radius: calc(var(--u) * 1.6); padding: calc(var(--u) * 1.3); line-height: 0; box-shadow: 0 0 0 calc(var(--u) * .45) var(--aksen); }
+    .sp-qrbox img, .sp-qrbox canvas { width: calc(var(--u) * 24); height: calc(var(--u) * 24); }
+    .sp-qrbox::after { content: 'PINDAI DI SINI'; position: absolute; left: 50%; bottom: calc(var(--u) * -3.2); transform: translateX(-50%); line-height: 1; white-space: nowrap; font-weight: 800; letter-spacing: .12em; color: var(--aksen); font-size: calc(var(--u) * 1.4); }
+    .sp-qrbox.denyut { animation: denyut 1.6s ease-in-out infinite; }
+    @keyframes denyut { 0%, 100% { box-shadow: 0 0 0 calc(var(--u) * .45) var(--aksen); } 50% { box-shadow: 0 0 0 calc(var(--u) * 1.3) color-mix(in srgb, var(--aksen) 35%, transparent); } }
+    .sp-qr-adegan .sp-hp { transform: translateX(calc(var(--u) * 4)) rotate(8deg); }
+    .sp-qr-adegan.f2 .sp-hp, .sp-qr-adegan.f3 .sp-hp { transform: translateX(calc(var(--u) * -1.5)) rotate(-4deg); }
+    .sp-kamera { position: absolute; inset: 0; background: radial-gradient(circle at 50% 45%, #3b4652, #12171d); display: flex; align-items: center; justify-content: center; transition: opacity .6s; }
+    .sp-kamera .bidik { position: relative; width: 70%; aspect-ratio: 1; background: #fff; border-radius: calc(var(--u) * .6); padding: calc(var(--u) * .6); opacity: .25; transform: scale(.75); transition: opacity .8s, transform 1s; }
+    .f2 .sp-kamera .bidik, .f3 .sp-kamera .bidik { opacity: 1; transform: scale(1); }
+    .sp-kamera .bidik img { width: 100%; height: 100%; display: block; }
+    .sp-kamera .bidik::before, .sp-kamera .bidik::after { content: ''; position: absolute; inset: calc(var(--u) * -.8); border: calc(var(--u) * .35) solid var(--aksen); border-radius: calc(var(--u) * .8); -webkit-mask: linear-gradient(#000 0 0) top left / 28% 28% no-repeat, linear-gradient(#000 0 0) top right / 28% 28% no-repeat, linear-gradient(#000 0 0) bottom left / 28% 28% no-repeat, linear-gradient(#000 0 0) bottom right / 28% 28% no-repeat; mask: linear-gradient(#000 0 0) top left / 28% 28% no-repeat, linear-gradient(#000 0 0) top right / 28% 28% no-repeat, linear-gradient(#000 0 0) bottom left / 28% 28% no-repeat, linear-gradient(#000 0 0) bottom right / 28% 28% no-repeat; }
+    .sp-kamera .bidik::after { inset: 0; border: 0; height: calc(var(--u) * .35); background: var(--aksen); -webkit-mask: none; mask: none; box-shadow: 0 0 calc(var(--u) * 1) var(--aksen); animation: garisPindai 1.8s ease-in-out infinite; }
+    @keyframes garisPindai { 0%, 100% { top: 4%; } 50% { top: 94%; } }
+    .sp-kamera .tombol-foto { position: absolute; bottom: calc(var(--u) * 1.4); width: calc(var(--u) * 3); height: calc(var(--u) * 3); border-radius: 50%; border: calc(var(--u) * .35) solid #fff; }
+    .sp-tautan { position: absolute; left: calc(var(--u) * .8); right: calc(var(--u) * .8); top: calc(var(--u) * 2.6); background: #fff; color: #111; border-radius: calc(var(--u) * 1.1); padding: calc(var(--u) * .8) calc(var(--u) * 1); font-size: calc(var(--u) * .95); line-height: 1.3; box-shadow: 0 calc(var(--u) * .6) calc(var(--u) * 1.6) rgba(0,0,0,.4); transform: translateY(calc(var(--u) * -8)); transition: transform .6s cubic-bezier(.2,.8,.2,1); z-index: 4; }
+    .sp-tautan b { display: block; font-size: 1.05em; color: #1B4332; }
+    .f3 .sp-tautan { transform: none; }
+    .sp-buka { position: absolute; inset: 0; background: #F9FAF6; opacity: 0; transition: opacity .6s; z-index: 3; padding: calc(var(--u) * 2.4) calc(var(--u) * .9) 0; }
+    .sp-buka.tampil { opacity: 1; }
+    /* Adegan 3 — isi data (tiruan form antrean.html) */
+    .sp-isi-adegan, .sp-tunggu-adegan { grid-template-columns: auto 1fr; padding: 0 calc(var(--u) * 4); }
+    .fm-gulir { transition: transform .7s cubic-bezier(.2,.8,.2,1); padding: calc(var(--u) * 2.4) calc(var(--u) * .9) calc(var(--u) * 2); }
+    .fm-brand { background: #1B4332; color: #fff; border-radius: calc(var(--u) * .9); padding: calc(var(--u) * .8) calc(var(--u) * .9); margin-bottom: calc(var(--u) * .7); }
+    .fm-brand b { display: block; font-size: calc(var(--u) * 1.05); }
+    .fm-brand span { font-size: calc(var(--u) * .75); opacity: .85; }
+    .fm-kartu { background: #fff; border: 1px solid #E5E7EB; border-radius: calc(var(--u) * .9); padding: calc(var(--u) * .9); }
+    .fm-f { margin-bottom: calc(var(--u) * .75); }
+    .fm-f label { display: block; font-weight: 600; font-size: calc(var(--u) * .78); margin-bottom: calc(var(--u) * .25); }
+    .fm-f label small { font-weight: 400; color: #6b7280; }
+    .fm-in { position: relative; border: 1px solid #dee2e6; border-radius: calc(var(--u) * .6); padding: calc(var(--u) * .45) calc(var(--u) * .6); min-height: calc(var(--u) * 2.1); font-size: calc(var(--u) * .9); display: flex; align-items: center; background: #fff; transition: border-color .3s, box-shadow .3s; white-space: nowrap; overflow: hidden; }
+    .fm-in.ph { color: #9ca3af; }
+    .fm-in.pilih::after { content: '⌄'; position: absolute; right: calc(var(--u) * .6); top: calc(var(--u) * .15); color: #6b7280; }
+    .fm-f.fokus .fm-in, .fm-in.fokus { border-color: #52796f; box-shadow: 0 0 0 calc(var(--u) * .25) rgba(82,121,111,.3); }
+    .fm-f.fokus .fm-in::before { content: ''; order: 2; width: 1.5px; height: 1.1em; background: #1B4332; margin-left: 1px; animation: kursor 1s steps(1) infinite; }
+    @keyframes kursor { 50% { opacity: 0; } }
+    .fm-mode { display: flex; gap: calc(var(--u) * .35); flex-wrap: wrap; margin-bottom: calc(var(--u) * .45); }
+    .fm-mode i { font-style: normal; border: 1px solid #cfd8d3; border-radius: 999px; padding: calc(var(--u) * .2) calc(var(--u) * .6); font-size: calc(var(--u) * .72); }
+    .fm-mode i.on { background: #1B4332; color: #fff; border-color: #1B4332; }
+    .fm-sub { font-size: calc(var(--u) * .7); color: #374151; margin: calc(var(--u) * .3) 0 calc(var(--u) * .2); }
+    .fm-chip { display: none; align-items: center; gap: calc(var(--u) * .3); background: #DCFCE7; color: #1B4332; border: 1px solid rgba(27,67,50,.3); border-radius: 999px; padding: calc(var(--u) * .2) calc(var(--u) * .6); font-size: calc(var(--u) * .78); font-weight: 600; margin-bottom: calc(var(--u) * .35); animation: muncul .4s ease-out; }
+    .fm-chip.tampil { display: inline-flex; }
+    @keyframes muncul { from { transform: scale(.6); opacity: 0; } to { transform: none; opacity: 1; } }
+    .fm-daftar { display: none; border: 1px solid #E5E7EB; border-radius: calc(var(--u) * .6); margin-top: calc(var(--u) * .25); overflow: hidden; font-size: calc(var(--u) * .8); }
+    .fm-daftar.tampil { display: block; animation: muncul .3s ease-out; }
+    .fm-daftar div { padding: calc(var(--u) * .45) calc(var(--u) * .6); border-bottom: 1px solid #f1f5f9; }
+    .fm-daftar div.on { background: #DCFCE7; font-weight: 700; color: #1B4332; }
+    .fm-tombol { background: #1B4332; color: #fff; border-radius: calc(var(--u) * .6); text-align: center; font-weight: 600; padding: calc(var(--u) * .7); font-size: calc(var(--u) * .92); transition: transform .2s, background .3s; }
+    .fm-tombol.tekan { transform: scale(.94); background: #0f2a1f; }
+    .fm-tombol.ok { background: #2d6a4f; }
+    /* Adegan 4 — tunggu dipanggil */
+    .sp-tiket { margin: calc(var(--u) * 2.6) calc(var(--u) * .9) 0; background: #1B4332; color: #fff; border-radius: calc(var(--u) * 1.1); text-align: center; padding: calc(var(--u) * 1.4) calc(var(--u) * .9); transform: scale(.7); opacity: 0; transition: transform .6s cubic-bezier(.2,.8,.2,1.4), opacity .4s; }
+    .tunjuk .sp-tiket { transform: none; opacity: 1; }
+    .sp-tiket .lbl { font-size: calc(var(--u) * .7); letter-spacing: .1em; text-transform: uppercase; opacity: .8; }
+    .sp-tiket .num { font-size: calc(var(--u) * 3.6); font-weight: 700; letter-spacing: .03em; line-height: 1.15; white-space: nowrap; }
+    .L-tegak .sp-tiket .num { font-size: calc(var(--u) * 2.9); }
+    .sp-tiket .tk-chip { background: rgba(255,255,255,.12); border-radius: calc(var(--u) * .7); padding: calc(var(--u) * .6); margin-top: calc(var(--u) * .7); font-size: calc(var(--u) * .78); text-align: left; line-height: 1.5; }
+    .sp-tiket-ket { font-size: calc(var(--u) * .75); color: #6b7280; text-align: center; margin: calc(var(--u) * .7) calc(var(--u) * 1) 0; }
+    .sp-kilat { position: absolute; inset: 0; background: #fff; opacity: 0; pointer-events: none; z-index: 7; }
+    .sp-kilat.jepret { animation: jepret .5s ease-out; }
+    @keyframes jepret { 0% { opacity: .9; } 100% { opacity: 0; } }
+    .sp-hp.getar { animation: getar .12s linear 8; }
+    @keyframes getar { 0%, 100% { margin-left: 0; } 25% { margin-left: calc(var(--u) * -.25); } 75% { margin-left: calc(var(--u) * .25); } }
+    .sp-kanan { display: flex; flex-direction: column; gap: calc(var(--u) * 1.2); min-width: 0; }
+    .sp-tv { position: relative; align-self: flex-start; width: calc(var(--u) * 34); aspect-ratio: 16 / 9; background: #10291f; border: calc(var(--u) * .6) solid #222b33; border-radius: calc(var(--u) * 1); display: flex; flex-direction: column; align-items: center; justify-content: center; color: #fff; box-shadow: 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,.4); transition: box-shadow .4s; }
+    .sp-tv small { font-size: calc(var(--u) * .9); letter-spacing: .15em; color: #b9d6c7; }
+    .sp-tv b { font-size: calc(var(--u) * 5.4); line-height: 1.05; font-variant-numeric: tabular-nums; }
+    .sp-tv i { font-style: normal; background: #D4A017; color: #1B4332; font-weight: 800; border-radius: 999px; padding: calc(var(--u) * .2) calc(var(--u) * 1); font-size: calc(var(--u) * 1.1); }
+    .sp-tv span { font-size: calc(var(--u) * 1.3); font-weight: 700; margin-top: calc(var(--u) * .3); min-height: 1.3em; }
+    .sp-tv.panggil { box-shadow: 0 0 0 calc(var(--u) * .7) var(--aksen), 0 calc(var(--u) * 1) calc(var(--u) * 3) rgba(0,0,0,.4); animation: kedipTv .8s ease-in-out 4; }
+    @keyframes kedipTv { 50% { box-shadow: 0 0 0 calc(var(--u) * 1.4) color-mix(in srgb, var(--aksen) 30%, transparent); } }
+    .sp-gelombang { position: absolute; right: calc(var(--u) * -4.6); top: 30%; width: calc(var(--u) * 4); height: calc(var(--u) * 4); opacity: 0; transition: opacity .3s; color: var(--aksen); }
+    .sp-tv.panggil .sp-gelombang { opacity: 1; }
+    /* Adegan 5 — penutup */
+    .sp-tutup { grid-template-columns: 1fr auto; }
+    .sp-tutup h1 { margin: 0; font-size: calc(var(--u) * 5); font-weight: 800; line-height: 1.05; }
+    .sp-tutup h1 small { display: block; font-size: .34em; color: var(--aksen); letter-spacing: .25em; margin-bottom: calc(var(--u) * .6); }
+    .sp-tutup .sp-tiga { margin-top: calc(var(--u) * 2); }
+    .sp-tutup .sp-kartu { padding-top: calc(var(--u) * 2); }
+    .sp-tutup .sp-kartu svg { max-height: calc(var(--u) * 9); }
+    .sp-tutup .sp-qrbox img, .sp-tutup .sp-qrbox canvas { width: calc(var(--u) * 17); height: calc(var(--u) * 17); }
+    .sp-bantuan { margin-top: calc(var(--u) * 1.6); font-size: calc(var(--u) * 1.5); color: var(--teks2); }
+    .sp-bantuan b { color: var(--aksen); }
+    /* Tegak (TV diputar) */
+    .L-tegak #mSapa { padding: calc(var(--u) * 2) calc(var(--u) * 1.6); }
+    .L-tegak .sp-atas { flex-direction: column; align-items: stretch; gap: calc(var(--u) * 1); }
+    .L-tegak .sp-adegan { grid-template-columns: 1fr !important; grid-auto-rows: min-content; align-content: center; justify-items: center; padding: 0; gap: calc(var(--u) * 2.4); }
+    .L-tegak .sp-salam .sp-tiga, .L-tegak .sp-tutup .sp-tiga { width: 100%; }
+    .L-tegak .sp-qr-adegan .sp-hp { display: none; }
+    .L-tegak .sp-kanan, .L-tegak .sp-teks { width: 100%; }
+    .L-tegak .sp-tv { align-self: center; width: calc(var(--u) * 30); }
+    .L-tegak .sp-hp { width: calc(var(--u) * 16); height: calc(var(--u) * 31); }
+    .L-tegak .sp-kanan { gap: calc(var(--u) * .8); }
+    /* Strip (banner tipis): cukup judul, tahap & QR */
     .L-strip #mSapa { flex-direction: row; align-items: center; padding: calc(var(--u) * .6) calc(var(--u) * 1.4); gap: calc(var(--u) * 1.4); }
-    .L-strip .sapa-kepala { text-align: left; flex: 0 0 auto; }
-    .L-strip .sapa-kepala .sapa-label { font-size: calc(var(--u) * 1); }
-    .L-strip .sapa-kepala h1 { font-size: calc(var(--u) * 2.6); }
-    .L-strip .sapa-kepala p, .L-strip .sapa-kaki, .L-strip .langkah .ilus, .L-strip .langkah span { display: none; }
-    .L-strip .sapa-isi { grid-template-columns: auto 1fr; gap: calc(var(--u) * 1.2); align-items: center; }
-    .L-strip .sapa-qr { padding: calc(var(--u) * .4); box-shadow: none; flex-direction: row; }
-    .L-strip .sapa-qr .kode img, .L-strip .sapa-qr .kode canvas { width: calc(var(--u) * 7.5); height: calc(var(--u) * 7.5); }
-    .L-strip .sapa-qr b { display: none; }
-    .L-strip .langkah { padding: calc(var(--u) * .6) calc(var(--u) * .8) calc(var(--u) * .6) calc(var(--u) * 3.4); }
-    .L-strip .langkah .no { top: 50%; left: calc(var(--u) * .5); transform: translateY(-50%); width: calc(var(--u) * 2.4); height: calc(var(--u) * 2.4); font-size: calc(var(--u) * 1.3); }
-    .L-strip .langkah b { margin: 0; font-size: calc(var(--u) * 1.6); }
-    .L-strip .langkah.aktif { transform: none; }
+    .L-strip .sp-atas { flex: 1; }
+    .L-strip .sp-merek span { font-size: calc(var(--u) * 2.4); }
+    .L-strip .sp-tahap li { font-size: calc(var(--u) * 1.4); }
+    .L-strip .sp-panggung { flex: 0 0 auto; width: calc(var(--u) * 8.4); height: calc(var(--u) * 8.4); }
+    .L-strip .sp-adegan { display: none; }
+    .L-strip .sp-adegan.sp-qr-adegan { display: flex; opacity: 1; visibility: visible; transform: none; }
+    .L-strip .sp-qr-adegan > :not(.sp-qrbox) { display: none; }
+    .L-strip .sp-qrbox { padding: calc(var(--u) * .4); box-shadow: none; animation: none; }
+    .L-strip .sp-qrbox::after { display: none; }
+    .L-strip .sp-qrbox img, .L-strip .sp-qrbox canvas { width: calc(var(--u) * 7.6); height: calc(var(--u) * 7.6); }
+    .L-strip .sp-kaki { display: none; }
     .sembunyi { display: none !important; }
     /* Status koneksi & pengaturan layar */
     #status { position: absolute; right: calc(var(--u) * .6); bottom: calc(var(--u) * .4); width: 10px; height: 10px; border-radius: 50%; background: #2ecc71; opacity: .5; z-index: 5; }
@@ -236,18 +355,110 @@
       </section>
     </main>
     <footer class="jalan" id="mJalan"><span id="mJalanTeks"></span></footer>
-    <!-- v6.10: layar sapaan "Selamat Datang" + cara ambil antrean mandiri (tombol di Front Office) -->
+    <!-- v6.11: layar sapaan 5 segmen (tombol "Selamat Datang" di Front Office). Lama tiap segmen = panjang voice over MP3 -->
     <div id="mSapa" aria-live="polite">
-      <div class="sapa-kepala"><div class="sapa-label">SELAMAT DATANG</div><h1 id="sInstansi">KUA</h1><p>Ambil nomor antrean sendiri, cukup 3 langkah mudah</p></div>
-      <div class="sapa-isi">
-        <div class="sapa-qr"><div class="kode" id="sQr"></div><b>PINDAI DI SINI</b></div>
-        <div class="sapa-langkah">
-          <div class="langkah" data-i="0"><div class="no">1</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><g fill="#fff"><rect x="54" y="38" width="52" height="52" rx="4"/></g><g fill="#1B4332"><rect x="58" y="42" width="14" height="14"/><rect x="88" y="42" width="14" height="14"/><rect x="58" y="72" width="14" height="14"/><rect x="61" y="45" width="8" height="8" fill="#fff"/><rect x="91" y="45" width="8" height="8" fill="#fff"/><rect x="61" y="75" width="8" height="8" fill="#fff"/><rect x="77" y="44" width="6" height="6"/><rect x="77" y="58" width="6" height="6"/><rect x="85" y="64" width="6" height="6"/><rect x="95" y="74" width="7" height="7"/><rect x="78" y="78" width="7" height="7"/><rect x="88" y="84" width="5" height="5"/></g><path d="M50 34 h10 M50 34 v10 M110 34 h-10 M110 34 v10 M50 94 h10 M50 94 v-10 M110 94 h-10 M110 94 v-10" stroke="#D4A017" stroke-width="4" stroke-linecap="round" fill="none"/><rect class="pindai" x="50" y="38" width="60" height="4" rx="2" fill="#D4A017"/><rect x="56" y="108" width="48" height="10" rx="5" fill="#D4A017"/><rect x="62" y="126" width="36" height="6" rx="3" fill="currentColor" opacity=".5"/></svg></div><div class="teks-l"><b>Pindai QR</b><span>Buka kamera HP, arahkan ke kode QR, lalu ketuk tautan yang muncul</span></div></div>
-          <div class="langkah" data-i="1"><div class="no">2</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><rect x="54" y="34" width="26" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="43" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="58" y="47" width="22" height="4" rx="2" fill="#D4A017" class="kedip-tik"/><rect x="54" y="62" width="34" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="71" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="54" y="90" width="24" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="99" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M96 103 l4 4 l4 -4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="54" y="120" width="52" height="14" rx="7" fill="#D4A017"/><path d="M73 127 l5 4 l9 -8" stroke="#1B4332" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg></div><div class="teks-l"><b>Isi data</b><span>Isi NIK, nama, nomor WhatsApp &amp; alamat, pilih layanan, lalu tekan Ambil Nomor Antrean</span></div></div>
-          <div class="langkah" data-i="2"><div class="no">3</div><div class="ilus"><svg viewBox="0 0 160 160" aria-hidden="true"><path d="M20 50 h120 a6 6 0 0 1 6 6 v12 a12 12 0 0 0 0 24 v12 a6 6 0 0 1 -6 6 h-120 a6 6 0 0 1 -6 -6 v-12 a12 12 0 0 0 0 -24 v-12 a6 6 0 0 1 6 -6 z" fill="#D4A017"/><line x1="44" y1="58" x2="44" y2="102" stroke="#1B4332" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/><text x="91" y="88" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="22" fill="#1B4332">A-001</text><path d="M24 74 h5 l7 -6 v24 l-7 -6 h-5 z" fill="#1B4332"/><g stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" class="kedip-tik"><path d="M112 32 q10 -10 22 -4"/><path d="M118 42 q8 -6 16 -2"/><path d="M48 128 q-10 10 -22 4"/><path d="M42 118 q-8 6 -16 2"/></g></svg></div><div class="teks-l"><b>Tunggu dipanggil</b><span>Simpan nomor antrean Anda, duduk, dan dengarkan panggilan</span></div></div>
-        </div>
+      <div class="sp-atas">
+        <div class="sp-merek"><b>SELAMAT DATANG</b><span data-isi="instansi">KUA</span></div>
+        <ol class="sp-tahap" id="sTahap">
+          <li><span data-no="1">Salam</span><i></i></li>
+          <li><span data-no="2">Pindai QR</span><i></i></li>
+          <li><span data-no="3">Isi Data</span><i></i></li>
+          <li><span data-no="4">Tunggu Dipanggil</span><i></i></li>
+          <li><span data-no="5">Selesai</span><i></i></li>
+        </ol>
       </div>
-      <div class="sapa-kaki"><span>Kembali ke layar antrean dalam <b id="sSisa">45</b> detik</span><div class="sapa-bar"><i id="sBar"></i></div></div>
+      <div class="sp-panggung">
+        <!-- 1. Salam: gambaran 3 langkah -->
+        <section class="sp-adegan sp-salam" data-s="0">
+          <div><h1><small>SELAMAT DATANG DI</small><span data-isi="instansi">KUA</span></h1>
+            <p class="sp-sub">Ambil nomor antrean sendiri lewat HP Anda — cukup 3 langkah mudah</p></div>
+          <div class="sp-tiga">
+            <div class="sp-kartu"><div class="no">1</div><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><g fill="#fff"><rect x="54" y="38" width="52" height="52" rx="4"/></g><g fill="#1B4332"><rect x="58" y="42" width="14" height="14"/><rect x="88" y="42" width="14" height="14"/><rect x="58" y="72" width="14" height="14"/><rect x="61" y="45" width="8" height="8" fill="#fff"/><rect x="91" y="45" width="8" height="8" fill="#fff"/><rect x="61" y="75" width="8" height="8" fill="#fff"/><rect x="77" y="44" width="6" height="6"/><rect x="77" y="58" width="6" height="6"/><rect x="85" y="64" width="6" height="6"/><rect x="95" y="74" width="7" height="7"/><rect x="78" y="78" width="7" height="7"/><rect x="88" y="84" width="5" height="5"/></g><path d="M50 34 h10 M50 34 v10 M110 34 h-10 M110 34 v10 M50 94 h10 M50 94 v-10 M110 94 h-10 M110 94 v-10" stroke="#D4A017" stroke-width="4" stroke-linecap="round" fill="none"/><rect class="pindai" x="50" y="38" width="60" height="4" rx="2" fill="#D4A017"/><rect x="56" y="108" width="48" height="10" rx="5" fill="#D4A017"/><rect x="62" y="126" width="36" height="6" rx="3" fill="currentColor" opacity=".5"/></svg><b>Pindai QR</b><span>dengan kamera HP</span></div>
+            <div class="sp-kartu"><div class="no">2</div><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><rect x="54" y="34" width="26" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="43" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="58" y="47" width="22" height="4" rx="2" fill="#D4A017" class="kedip-tik"/><rect x="54" y="62" width="34" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="71" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="54" y="90" width="24" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="99" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M96 103 l4 4 l4 -4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="54" y="120" width="52" height="14" rx="7" fill="#D4A017"/><path d="M73 127 l5 4 l9 -8" stroke="#1B4332" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><b>Isi data</b><span>NIK, nama, WhatsApp, alamat &amp; layanan</span></div>
+            <div class="sp-kartu"><div class="no">3</div><svg viewBox="0 0 160 160" aria-hidden="true"><path d="M20 50 h120 a6 6 0 0 1 6 6 v12 a12 12 0 0 0 0 24 v12 a6 6 0 0 1 -6 6 h-120 a6 6 0 0 1 -6 -6 v-12 a12 12 0 0 0 0 -24 v-12 a6 6 0 0 1 6 -6 z" fill="#D4A017"/><line x1="44" y1="58" x2="44" y2="102" stroke="#1B4332" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/><text x="91" y="88" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="22" fill="#1B4332">A-001</text><path d="M24 74 h5 l7 -6 v24 l-7 -6 h-5 z" fill="#1B4332"/><g stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" class="kedip-tik"><path d="M112 32 q10 -10 22 -4"/><path d="M118 42 q8 -6 16 -2"/><path d="M48 128 q-10 10 -22 4"/><path d="M42 118 q-8 6 -16 2"/></g></svg><b>Tunggu dipanggil</b><span>nomor &amp; nama Anda dipanggil</span></div>
+          </div>
+        </section>
+        <!-- 2. Pindai QR dengan kamera HP -->
+        <section class="sp-adegan sp-qr-adegan" data-s="1">
+          <div class="sp-qrbox denyut"><div class="kode" id="sQr"></div></div>
+          <div class="sp-hp"><div class="sp-layar">
+            <div class="sp-kamera"><div class="bidik"><img class="sp-qr-img" alt=""></div><div class="tombol-foto"></div></div>
+            <div class="sp-tautan"><b>🔗 Buka tautan</b><span id="sTautan">antrean.html</span></div>
+            <div class="sp-buka" id="sBuka"><div class="fm-brand"><b>Ambil Nomor Antrean</b><span data-isi="instansi">KUA</span></div><div class="fm-kartu"><div class="fm-f"><label>NIK</label><div class="fm-in"></div></div><div class="fm-f"><label>Nama Lengkap</label><div class="fm-in"></div></div></div></div>
+            <div class="sp-jari" id="sJariQr" style="left: 42%; top: 13%;"></div>
+          </div></div>
+          <div class="sp-teks">
+            <h2 class="sp-judul-adegan"><small>LANGKAH 1</small>Pindai kode QR</h2>
+            <ol class="sp-poin" id="sPoinQr">
+              <li><em><span>1</span></em><div><b>Buka kamera HP</b>Kamera biasa atau Google Lens</div></li>
+              <li><em><span>2</span></em><div><b>Arahkan ke kode QR</b>Tahan sebentar sampai muncul tautan</div></li>
+              <li><em><span>3</span></em><div><b>Ketuk tautan yang muncul</b>Form antrean langsung terbuka</div></li>
+            </ol>
+          </div>
+        </section>
+        <!-- 3. Isi data: tiruan form antrean asli -->
+        <section class="sp-adegan sp-isi-adegan" data-s="2">
+          <div class="sp-hp" id="sHpIsi"><div class="sp-layar"><div class="fm-gulir" id="sFmGulir">
+            <div class="fm-brand"><b>Ambil Nomor Antrean</b><span data-isi="instansi">KUA</span></div>
+            <div class="fm-kartu">
+              <div class="fm-f" data-f="nik"><label>NIK</label><div class="fm-in" data-ketik="3502123456780001"></div></div>
+              <div class="fm-f" data-f="nama"><label>Nama Lengkap</label><div class="fm-in" data-ketik="AHMAD FAUZI"></div></div>
+              <div class="fm-f" data-f="hp"><label>Nomor WhatsApp</label><div class="fm-in ph" data-ketik="081234567890" data-ph="08xxxxxxxxxx">08xxxxxxxxxx</div></div>
+              <div class="fm-f" data-f="alamat"><label>Alamat</label>
+                <div class="fm-mode"><i class="on" data-isi="kec">Kec. —</i><i>Kec. lain</i><i>Luar Kabupaten</i></div>
+                <div class="fm-sub">Desa/Kelurahan</div><div class="fm-in pilih ph" id="sFmDesa" data-ph="Pilih desa/kelurahan">Pilih desa/kelurahan</div>
+                <div class="fm-in ph" style="margin-top: calc(var(--u) * .45);" id="sFmDusun" data-ketik="Dusun Krajan RT 01 / RW 02" data-ph="Dusun / RT / RW (opsional)">Dusun / RT / RW (opsional)</div></div>
+              <div class="fm-f" data-f="layanan"><label>Layanan yang Dituju <small>(boleh lebih dari satu)</small></label>
+                <div class="fm-chip" id="sFmChip">Pendaftaran Kehendak Nikah ✕</div>
+                <div class="fm-in ph" data-ketik="nikah" data-ph="Cari layanan..." id="sFmCari">Cari layanan...</div>
+                <div class="fm-daftar" id="sFmDaftar"><div class="on">Pendaftaran Kehendak Nikah</div><div>Rekomendasi Nikah</div><div>Duplikat Buku Nikah</div></div></div>
+              <div class="fm-tombol" id="sFmTombol">Ambil Nomor Antrean</div>
+            </div>
+          </div><div class="sp-jari" id="sJariIsi"></div></div></div>
+          <div class="sp-teks">
+            <h2 class="sp-judul-adegan"><small>LANGKAH 2</small>Isi data di form</h2>
+            <ol class="sp-poin" id="sPoinIsi">
+              <li><em><span>1</span></em><div><b>NIK</b>16 digit sesuai KTP</div></li>
+              <li><em><span>2</span></em><div><b>Nama lengkap</b>Sesuai KTP</div></li>
+              <li><em><span>3</span></em><div><b>Nomor WhatsApp aktif</b>Untuk informasi layanan dari KUA</div></li>
+              <li><em><span>4</span></em><div><b>Alamat</b>Pilih desa, lalu dusun / RT / RW</div></li>
+              <li><em><span>5</span></em><div><b>Layanan yang dituju</b>Ketik kata kunci, lalu pilih — boleh lebih dari satu</div></li>
+              <li><em><span>6</span></em><div><b>Tekan "Ambil Nomor Antrean"</b>Nomor langsung tampil di HP</div></li>
+            </ol>
+          </div>
+        </section>
+        <!-- 4. Tunggu: nomor di HP → dipanggil di layar ini -->
+        <section class="sp-adegan sp-tunggu-adegan" data-s="3">
+          <div class="sp-hp" id="sHpTiket"><div class="sp-layar">
+            <div class="sp-tiket"><div class="lbl">Nomor Antrean Anda</div><div class="num">A-012</div>
+              <div class="tk-chip"><div><span style="opacity:.75">Nama:</span> <b>AHMAD FAUZI</b></div><div><span style="opacity:.75">Layanan:</span> <b>Pendaftaran Kehendak Nikah</b></div><div><span style="opacity:.75">Antrean sebelum Anda:</span> <b>1</b></div></div></div>
+            <p class="sp-tiket-ket">Screenshot layar ini, lalu tunggu panggilan. Bawa berkas persyaratan asli.</p>
+            <div class="sp-kilat" id="sKilat"></div>
+          </div></div>
+          <div class="sp-kanan">
+            <h2 class="sp-judul-adegan"><small>LANGKAH 3</small>Tunggu nomor Anda dipanggil</h2>
+            <div class="sp-tv" id="sTv"><small>NOMOR DIPANGGIL</small><b id="sTvNo">A-011</b><i>MENUJU LOKET</i><span id="sTvNama"></span>
+              <svg class="sp-gelombang" viewBox="0 0 40 40" aria-hidden="true"><g stroke="currentColor" stroke-width="3.5" fill="none" stroke-linecap="round"><path d="M8 14 q6 6 0 12"/><path d="M16 9 q10 11 0 22"/><path d="M24 4 q14 16 0 32"/></g></svg></div>
+            <ol class="sp-poin" id="sPoinTunggu" style="margin-top:0">
+              <li><em><span>1</span></em><div><b>Simpan nomor antrean</b>Screenshot layar HP Anda</div></li>
+              <li><em><span>2</span></em><div><b>Silakan duduk</b>Perhatikan layar ini &amp; dengarkan panggilan</div></li>
+              <li><em><span>3</span></em><div><b>Nomor &amp; nama Anda dipanggil</b>Segera menuju loket dengan berkas asli</div></li>
+            </ol>
+          </div>
+        </section>
+        <!-- 5. Penutup: ringkasan semua langkah -->
+        <section class="sp-adegan sp-tutup" data-s="4">
+          <div><h1><small>TERIMA KASIH</small>Mudah, bukan?</h1>
+            <div class="sp-tiga">
+              <div class="sp-kartu"><div class="no">1</div><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><g fill="#fff"><rect x="54" y="38" width="52" height="52" rx="4"/></g><g fill="#1B4332"><rect x="58" y="42" width="14" height="14"/><rect x="88" y="42" width="14" height="14"/><rect x="58" y="72" width="14" height="14"/><rect x="61" y="45" width="8" height="8" fill="#fff"/><rect x="91" y="45" width="8" height="8" fill="#fff"/><rect x="61" y="75" width="8" height="8" fill="#fff"/><rect x="77" y="44" width="6" height="6"/><rect x="77" y="58" width="6" height="6"/><rect x="85" y="64" width="6" height="6"/><rect x="95" y="74" width="7" height="7"/><rect x="78" y="78" width="7" height="7"/><rect x="88" y="84" width="5" height="5"/></g><path d="M50 34 h10 M50 34 v10 M110 34 h-10 M110 34 v10 M50 94 h10 M50 94 v-10 M110 94 h-10 M110 94 v-10" stroke="#D4A017" stroke-width="4" stroke-linecap="round" fill="none"/><rect class="pindai" x="50" y="38" width="60" height="4" rx="2" fill="#D4A017"/><rect x="56" y="108" width="48" height="10" rx="5" fill="#D4A017"/><rect x="62" y="126" width="36" height="6" rx="3" fill="currentColor" opacity=".5"/></svg><b>Pindai QR</b></div>
+              <div class="sp-kartu"><div class="no">2</div><svg viewBox="0 0 160 160" aria-hidden="true"><rect x="42" y="10" width="76" height="140" rx="14" fill="none" stroke="currentColor" stroke-width="6"/><rect x="70" y="18" width="20" height="4" rx="2" fill="currentColor"/><rect x="54" y="34" width="26" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="43" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="58" y="47" width="22" height="4" rx="2" fill="#D4A017" class="kedip-tik"/><rect x="54" y="62" width="34" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="71" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><rect x="54" y="90" width="24" height="5" rx="2.5" fill="currentColor" opacity=".6"/><rect x="54" y="99" width="52" height="12" rx="4" fill="none" stroke="currentColor" stroke-width="3"/><path d="M96 103 l4 4 l4 -4" stroke="currentColor" stroke-width="2.5" fill="none" stroke-linecap="round"/><rect x="54" y="120" width="52" height="14" rx="7" fill="#D4A017"/><path d="M73 127 l5 4 l9 -8" stroke="#1B4332" stroke-width="3" fill="none" stroke-linecap="round" stroke-linejoin="round"/></svg><b>Isi data</b></div>
+              <div class="sp-kartu"><div class="no">3</div><svg viewBox="0 0 160 160" aria-hidden="true"><path d="M20 50 h120 a6 6 0 0 1 6 6 v12 a12 12 0 0 0 0 24 v12 a6 6 0 0 1 -6 6 h-120 a6 6 0 0 1 -6 -6 v-12 a12 12 0 0 0 0 -24 v-12 a6 6 0 0 1 6 -6 z" fill="#D4A017"/><line x1="44" y1="58" x2="44" y2="102" stroke="#1B4332" stroke-width="2" stroke-dasharray="5 5" opacity=".6"/><text x="91" y="88" text-anchor="middle" font-family="Inter, Arial, sans-serif" font-weight="800" font-size="22" fill="#1B4332">A-001</text><path d="M24 74 h5 l7 -6 v24 l-7 -6 h-5 z" fill="#1B4332"/><g stroke="currentColor" stroke-width="5" fill="none" stroke-linecap="round" class="kedip-tik"><path d="M112 32 q10 -10 22 -4"/><path d="M118 42 q8 -6 16 -2"/><path d="M48 128 q-10 10 -22 4"/><path d="M42 118 q-8 6 -16 2"/></g></svg><b>Tunggu dipanggil</b></div>
+            </div>
+            <p class="sp-bantuan">Butuh bantuan? Petugas kami siap membantu di <b>meja PTSP</b>.</p></div>
+          <div class="sp-qrbox"><img class="sp-qr-img" alt="QR ambil antrean"></div>
+        </section>
+      </div>
+      <div class="sp-kaki"><span>Kembali ke layar antrean dalam <b id="sSisa">0</b> detik</span><div class="sapa-bar"><i id="sBar"></i></div><span class="sp-vo" id="sVo"></span></div>
     </div>
     <div id="status" title="Koneksi"></div>
   </div>
@@ -274,6 +485,8 @@
     <input type="range" id="pSkala" min="50" max="200" step="5" style="width:100%">
     <label><input type="checkbox" id="pPenuhOto"> Otomatis layar penuh saat layar diklik</label>
     <p class="ket" style="margin:2px 0 0">Browser hanya mengizinkan layar penuh setelah ada klik/tombol ditekan. Setelah dibuka atau dimuat ulang, klik sekali di mana saja di monitor.</p>
+    <label><input type="checkbox" id="pVo"> Putar voice over layar "Selamat Datang" di layar ini</label>
+    <p class="ket" style="margin:2px 0 0">MP3 diunggah Kepala KUA di Pengaturan → Suara Panggilan. Suara keluar dari speaker komputer/TV monitor ini.</p>
     <label><input type="checkbox" id="pSuara"> Bunyikan panggilan di layar ini</label>
     <p class="ket" style="margin:2px 0 0">Nyalakan bila monitor ini dijalankan di komputer lain. Bila di komputer yang sama dengan loket, biarkan mati agar suara tidak dobel.</p>
     <div class="tombol">
@@ -291,7 +504,7 @@
   (function () {
     'use strict';
     var KUNCI_LAYAR = 'labuku_monitor_layar';
-    var SETEL_AWAL = { tata: 'lebar', lebar: 0, tinggi: 0, x: 0, y: 0, skala: 100, suara: false, penuhOto: true };
+    var SETEL_AWAL = { tata: 'lebar', lebar: 0, tinggi: 0, x: 0, y: 0, skala: 100, suara: false, penuhOto: true, vo: true };
     var KECEPATAN = { lambat: 45, sedang: 80, cepat: 130 }; // piksel per detik
     var ANGKA = ['nol', 'satu', 'dua', 'tiga', 'empat', 'lima', 'enam', 'tujuh', 'delapan', 'sembilan'];
     var D = null, idSekarang = null, pertama = true, slideIdx = 0, slideTimer = null, tarikTimer = null, teksTerakhir = '', qrDibuat = false;
@@ -390,40 +603,207 @@
       } catch (e) {}
     }
 
-    /* ---------- v6.10: layar sapaan "Selamat Datang" (45 detik) ---------- */
-    var sapaTerakhir = null, sapaTimer = null, sapaDetikT = null, sapaLangkahT = null, sapaQr = false;
-    function ucapSapa() {
-      if (!layar().suara || !window.speechSynthesis) return;
-      var cfg = (D && D.suara) || {};
-      var kal = String(cfg.suara_sapa || 'Selamat datang di {instansi}. Silakan ambil nomor antrean dengan memindai kode QR di layar.').replace(/\{instansi\}/g, (D && D.instansi) || 'KUA');
-      window.__ucapMonitor = kal;
-      try { window.speechSynthesis.cancel(); var u = new SpeechSynthesisUtterance(kal); u.lang = 'id-ID'; u.rate = 0.9; window.speechSynthesis.speak(u); } catch (e) {}
+    /* ---------- v6.11: layar sapaan 5 segmen + voice over MP3 (tanpa text-to-speech) ---------- */
+    var SAPA_SEG = ['salam', 'qr', 'isi', 'tunggu', 'penutup'];
+    var SAPA_DEF = { salam: 8, qr: 10, isi: 16, tunggu: 10, penutup: 8 };
+    var sapaTerakhir = null, sapaQr = false;
+    var sp = { mulai: 0, durasi: [], total: 0, raf: 0, seg: -1, suara: true, audio: null, sekali: {}, teksLama: {} };
+    var vo = { db: null, url: {}, muat: {} };
+
+    // --- cache MP3 di IndexedDB (sama dengan halaman Pengaturan: database "labuku_vo") ---
+    function idb() {
+      return new Promise(function (ok, gagal) {
+        if (vo.db) return ok(vo.db);
+        if (!window.indexedDB) return gagal(new Error('IndexedDB tidak tersedia'));
+        var r = indexedDB.open('labuku_vo', 1);
+        r.onupgradeneeded = function () { r.result.createObjectStore('mp3'); };
+        r.onsuccess = function () { vo.db = r.result; ok(vo.db); };
+        r.onerror = function () { gagal(r.error); };
+      });
     }
-    function tampilSapa(id, detik, bersuara) {
+    function idbAmbil(k) { return idb().then(function (db) { return new Promise(function (ok) { var q = db.transaction('mp3').objectStore('mp3').get(k); q.onsuccess = function () { ok(q.result || null); }; q.onerror = function () { ok(null); }; }); }).catch(function () { return null; }); }
+    function idbSimpan(k, blob) { return idb().then(function (db) { db.transaction('mp3', 'readwrite').objectStore('mp3').put(blob, k); }).catch(function () {}); }
+    function b64KeBlob(b64, mime) { var bin = atob(b64), arr = new Uint8Array(bin.length); for (var i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i); return new Blob([arr], { type: mime || 'audio/mpeg' }); }
+    /** URL audio untuk segmen: dari memori → IndexedDB → server (sekali saja, lalu disimpan). */
+    function urlVo(seg) {
+      var v = D && D.sapaCfg && D.sapaCfg.vo && D.sapaCfg.vo[seg];
+      if (!v) return Promise.resolve(null);
+      if (vo.url[v.id]) return Promise.resolve(vo.url[v.id]);
+      if (vo.muat[v.id]) return vo.muat[v.id];
+      vo.muat[v.id] = idbAmbil(v.id).then(function (blob) {
+        if (blob) return blob;
+        return new Promise(function (ok) {
+          google.script.run.withSuccessHandler(function (res) {
+            if (!res || !res.success || !res.data) return ok(null);
+            var b = b64KeBlob(res.data.base64, res.data.mime); idbSimpan(v.id, b); ok(b);
+          }).withFailureHandler(function () { ok(null); })
+            .api({ token: lsGet('labuku_token'), who: lsGet('labuku_who') || 'Monitor' }, 'getVoSapa', [seg]);
+        });
+      }).then(function (blob) { delete vo.muat[v.id]; if (!blob) return null; vo.url[v.id] = URL.createObjectURL(blob); return vo.url[v.id]; });
+      return vo.muat[v.id];
+    }
+    /** Unduh semua VO lebih dulu (sekali), supaya saat tombol Selamat Datang ditekan suara langsung keluar. */
+    function siapkanVo() { if (layar().vo === false) return; SAPA_SEG.forEach(function (s) { urlVo(s); }); }
+
+    function sapaDurasi() {
+      var c = (D && D.sapaCfg) || {};
+      return SAPA_SEG.map(function (s) { var v = c.vo && c.vo[s]; return v ? Number(v.durasi) + 0.6 : Number((c.durasi && c.durasi[s]) || SAPA_DEF[s]); });
+    }
+    function namaKec() {
+      var n = String((D && D.instansi) || '').replace(/^KUA\s+/i, '').replace(/^Kecamatan\s+/i, '').trim();
+      return n || 'Anda';
+    }
+    function salinQr() {
+      var c = document.querySelector('#sQr canvas'), im = document.querySelector('#sQr img');
+      var src = '';
+      try { src = (im && im.src && im.src.indexOf('data:') === 0) ? im.src : (c ? c.toDataURL('image/png') : ''); } catch (e) {}
+      if (src) document.querySelectorAll('#mSapa .sp-qr-img').forEach(function (x) { if (x.src !== src) x.src = src; });
+    }
+    function hentikanAudio() { if (sp.audio) { try { sp.audio.pause(); } catch (e) {} sp.audio = null; } teks('sVo', ''); }
+    function putarSegmen(i, lewat) {
+      hentikanAudio();
+      if (!sp.suara || layar().vo === false) return;
+      var seg = SAPA_SEG[i];
+      urlVo(seg).then(function (url) {
+        if (!url || sp.seg !== i || !el('mSapa').classList.contains('tampil')) return;
+        var a = new Audio(url); sp.audio = a;
+        if (lewat > 0.4) { try { a.currentTime = lewat; } catch (e) {} }
+        var p = a.play();
+        if (p && p.catch) p.catch(function () { teks('sVo', '🔇 klik layar sekali agar suara aktif'); });
+        teks('sVo', '🔊');
+      });
+    }
+    function tampilSapa(id, lewat, bersuara) {
       if (!id || id === sapaTerakhir) return;
       sapaTerakhir = id;
-      detik = Math.max(5, Math.min(120, Math.round(Number(detik) || 45)));
-      teks('sInstansi', (D && ((D.monitor && D.monitor.judul) || D.instansi)) || 'KUA');
+      sp.durasi = sapaDurasi();
+      sp.total = sp.durasi.reduce(function (a, b) { return a + b; }, 0);
+      lewat = Math.max(0, Math.min(sp.total - 0.5, Number(lewat) || 0));
+      sp.mulai = performance.now() - lewat * 1000;
+      sp.suara = bersuara !== false; sp.seg = -1;
+      document.querySelectorAll('#mSapa [data-isi="instansi"]').forEach(function (x) { x.textContent = (D && ((D.monitor && D.monitor.judul) || D.instansi)) || 'KUA'; });
+      document.querySelectorAll('#mSapa [data-isi="kec"]').forEach(function (x) { x.textContent = 'Kec. ' + namaKec(); });
+      try { teks('sTautan', new URL('antrean.html', location.href).host + '/…/antrean.html'); } catch (e) {}
       if (!sapaQr && typeof QRCode !== 'undefined') {
-        try { new QRCode(el('sQr'), { text: new URL('antrean.html', location.href).href, width: 360, height: 360, correctLevel: QRCode.CorrectLevel.M }); sapaQr = true; } catch (e) {}
+        try { new QRCode(el('sQr'), { text: new URL('antrean.html', location.href).href, width: 420, height: 420, correctLevel: QRCode.CorrectLevel.M }); sapaQr = true; } catch (e) {}
       }
+      salinQr(); setTimeout(salinQr, 300);
       el('mSapa').classList.add('tampil');
-      var bar = el('sBar'); bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth;
-      bar.style.transition = 'width ' + detik + 's linear'; bar.style.width = '0%';
-      var akhir = Date.now() + detik * 1000;
-      clearInterval(sapaDetikT); teks('sSisa', detik);
-      sapaDetikT = setInterval(function () { teks('sSisa', Math.max(0, Math.ceil((akhir - Date.now()) / 1000))); }, 500);
-      var ls = document.querySelectorAll('#mSapa .langkah'), i = 0;
-      var geser = function () { ls.forEach(function (x, k) { x.classList.toggle('aktif', k === i % ls.length); }); i++; };
-      clearInterval(sapaLangkahT); geser(); sapaLangkahT = setInterval(geser, 5000);
-      clearTimeout(sapaTimer); sapaTimer = setTimeout(tutupSapa, detik * 1000);
-      if (bersuara) ucapSapa();
+      // setInterval (bukan requestAnimationFrame) agar urutan segmen & suara tetap jalan walau jendela tidak sedang digambar
+      clearInterval(sp.raf); langkahSapa(); sp.raf = setInterval(langkahSapa, 100);
     }
     function tutupSapa() {
-      clearTimeout(sapaTimer); clearInterval(sapaDetikT); clearInterval(sapaLangkahT);
+      clearInterval(sp.raf); hentikanAudio(); sp.seg = -1;
       el('mSapa').classList.remove('tampil');
     }
     window.__tutupSapa = tutupSapa;
+    window.__sapaLompat = function (detik) { sp.mulai -= detik * 1000; }; // untuk uji & pratinjau
+    window.__sapaKe = function (detik) { sp.mulai = performance.now() - detik * 1000; };
+    window.__sapaInfo = function () { return { seg: sp.seg, total: sp.total, durasi: sp.durasi.slice(), audio: !!sp.audio, src: sp.audio ? sp.audio.src : '' }; };
+
+    function langkahSapa() {
+      var t = (performance.now() - sp.mulai) / 1000;
+      if (t >= sp.total) { tutupSapa(); return; }
+      var i = 0, awal = 0;
+      while (i < sp.durasi.length - 1 && t >= awal + sp.durasi[i]) { awal += sp.durasi[i]; i++; }
+      var lt = t - awal, p = Math.min(1, lt / sp.durasi[i]);
+      if (i !== sp.seg) gantiAdegan(i, lt);
+      perbaruiAdegan(i, p);
+      document.querySelectorAll('#sTahap li').forEach(function (li, k) {
+        li.classList.toggle('aktif', k === i); li.classList.toggle('selesai', k < i);
+        li.style.setProperty('--isi', (k === i ? Math.round(p * 100) : 0) + '%');
+      });
+      var sisa = String(Math.max(0, Math.ceil(sp.total - t)));
+      if (el('sSisa').textContent !== sisa) el('sSisa').textContent = sisa;
+      el('sBar').style.width = Math.max(0, 100 - t / sp.total * 100).toFixed(2) + '%';
+    }
+    function gantiAdegan(i, lt) {
+      sp.seg = i; sp.sekali = {};
+      document.querySelectorAll('#mSapa .sp-adegan').forEach(function (a) {
+        var k = Number(a.getAttribute('data-s'));
+        a.classList.toggle('aktif', k === i); a.classList.toggle('lewat', k < i);
+      });
+      // atur ulang keadaan awal adegan
+      if (i === 2) { el('sFmChip').classList.remove('tampil'); el('sFmDaftar').classList.remove('tampil'); el('sFmTombol').className = 'fm-tombol'; el('sFmTombol').textContent = 'Ambil Nomor Antrean'; }
+      if (i === 3) { el('sTv').classList.remove('panggil'); teks('sTvNo', 'A-011'); teks('sTvNama', ''); el('sHpTiket').classList.remove('tunjuk', 'getar'); }
+      putarSegmen(i, lt);
+    }
+    function sekali(k) { if (sp.sekali[k]) return false; sp.sekali[k] = true; return true; }
+    function poin(id, idx) {
+      var li = document.querySelectorAll('#' + id + ' li');
+      for (var k = 0; k < li.length; k++) { li[k].classList.toggle('aktif', k === idx); li[k].classList.toggle('selesai', k < idx); }
+    }
+    function ketik(elx, n) {
+      var full = elx.getAttribute('data-ketik') || '', ph = elx.getAttribute('data-ph') || '';
+      var tx = full.slice(0, Math.max(0, Math.min(full.length, n)));
+      var tampilTeks = tx || ph;
+      if (elx.textContent !== tampilTeks) elx.textContent = tampilTeks;
+      elx.classList.toggle('ph', !tx);
+    }
+    function jari(idJari, target, ya) {
+      var j = el(idJari); if (!j) return;
+      if (!ya || !target) { j.classList.remove('ketuk'); return; }
+      var lay = j.parentNode.getBoundingClientRect(), r = target.getBoundingClientRect();
+      j.style.left = (r.left - lay.left + r.width * 0.72 - j.offsetWidth / 2) + 'px';
+      j.style.top = (r.top - lay.top + r.height / 2 - j.offsetHeight / 2) + 'px';
+      j.classList.add('ketuk');
+    }
+    var FM = [
+      { f: 'nik', a: .03, b: .17, geser: 0 }, { f: 'nama', a: .19, b: .31, geser: 0 }, { f: 'hp', a: .33, b: .44, geser: 3 },
+      { f: 'alamat', a: .46, b: .62, geser: 8 }, { f: 'layanan', a: .64, b: .84, geser: 11 }, { f: 'tombol', a: .86, b: 1, geser: 12 }
+    ];
+    function perbaruiAdegan(i, p) {
+      if (i === 0 || i === 4) {
+        var kartu = document.querySelectorAll('#mSapa .sp-adegan[data-s="' + i + '"] .sp-kartu');
+        var aktif = p < .22 ? -1 : Math.min(2, Math.floor((p - .22) / .26));
+        for (var k = 0; k < kartu.length; k++) kartu[k].classList.toggle('sorot', k === aktif);
+      } else if (i === 1) {
+        var a1 = document.querySelector('#mSapa .sp-qr-adegan'), fase = p < .3 ? 1 : (p < .62 ? 2 : 3);
+        a1.classList.toggle('f2', fase === 2); a1.classList.toggle('f3', fase === 3);
+        poin('sPoinQr', fase - 1);
+        jari('sJariQr', document.querySelector('#mSapa .sp-tautan'), p > .72 && p < .86);
+        el('sBuka').classList.toggle('tampil', p >= .86);
+      } else if (i === 2) {
+        var idx = 0;
+        for (var n = 0; n < FM.length; n++) if (p >= FM[n].a) idx = n;
+        poin('sPoinIsi', p < FM[0].a ? -1 : idx);
+        document.querySelectorAll('#sHpIsi .fm-f').forEach(function (f) { f.classList.toggle('fokus', f.getAttribute('data-f') === FM[idx].f && p >= FM[idx].a && p < FM[idx].b && FM[idx].f !== 'alamat' && FM[idx].f !== 'layanan'); });
+        el('sFmGulir').style.transform = 'translateY(calc(var(--u) * -' + FM[idx].geser + '))';
+        ['nik', 'nama', 'hp'].forEach(function (f, k) {
+          var w = FM[k], e = document.querySelector('#sHpIsi .fm-f[data-f="' + f + '"] .fm-in'), full = e.getAttribute('data-ketik');
+          ketik(e, Math.round(full.length * Math.max(0, Math.min(1, (p - w.a) / ((w.b - w.a) * .85)))));
+        });
+        // alamat: desa dipilih, lalu dusun diketik
+        var desa = el('sFmDesa'), sudahDesa = p >= .5;
+        var teksDesa = sudahDesa ? namaKec().toUpperCase() : desa.getAttribute('data-ph');
+        if (desa.textContent !== teksDesa) desa.textContent = teksDesa;
+        desa.classList.toggle('ph', !sudahDesa); desa.classList.toggle('fokus', p >= .46 && p < .53);
+        var dusun = el('sFmDusun'); dusun.classList.toggle('fokus', p >= .54 && p < .62);
+        ketik(dusun, Math.round(dusun.getAttribute('data-ketik').length * Math.max(0, Math.min(1, (p - .54) / .07))));
+        // layanan: ketik kata kunci → daftar muncul → pilih → chip
+        var cari = el('sFmCari'), pilih = p >= .78;
+        cari.classList.toggle('fokus', p >= .64 && p < .78);
+        ketik(cari, pilih ? 0 : Math.round(5 * Math.max(0, Math.min(1, (p - .64) / .06))));
+        el('sFmDaftar').classList.toggle('tampil', p >= .71 && !pilih);
+        el('sFmChip').classList.toggle('tampil', pilih);
+        // tombol
+        var tb = el('sFmTombol');
+        tb.classList.toggle('tekan', p >= .88 && p < .92); tb.classList.toggle('ok', p >= .92);
+        var tt = p >= .92 ? '✓ Nomor antrean didapat' : 'Ambil Nomor Antrean';
+        if (tb.textContent !== tt) tb.textContent = tt;
+        var targetJari = p >= .47 && p < .52 ? desa : (p >= .73 && p < .78 ? document.querySelector('#sFmDaftar .on') : (p >= .86 && p < .93 ? tb : null));
+        jari('sJariIsi', targetJari, !!targetJari);
+      } else if (i === 3) {
+        var hp = el('sHpTiket');
+        hp.classList.toggle('tunjuk', p >= .06);
+        if (p >= .22 && sekali('jepret')) { var kl = el('sKilat'); kl.classList.remove('jepret'); void kl.offsetWidth; kl.classList.add('jepret'); }
+        poin('sPoinTunggu', p < .35 ? 0 : (p < .62 ? 1 : 2));
+        if (p >= .62 && sekali('panggil')) {
+          teks('sTvNo', 'A-012'); teks('sTvNama', 'AHMAD F.');
+          el('sTv').classList.add('panggil'); hp.classList.add('getar');
+        }
+      }
+    }
 
     /* ---------- v6.10: kartu "Layanan KUA" — daftar layanan aktif bergulir terus ---------- */
     var daftarKunci = '';
@@ -469,7 +849,8 @@
         if (!pertama) { var p = el('mPanggil'); p.classList.remove('baru'); void p.offsetWidth; p.classList.add('baru'); ucapPanggilan(s); }
         idSekarang = s.id;
       }
-      if (D.sapa && D.sapa.id) tampilSapa(D.sapa.id, D.sapa.sisa, !pertama); // v6.10: sapaan dari loket mana pun
+      siapkanVo(); // v6.11: unduh voice over sapaan lebih dulu (sekali, lalu dari cache)
+      if (D.sapa && D.sapa.id) tampilSapa(D.sapa.id, D.sapa.lewat != null ? D.sapa.lewat : 0, !pertama); // sapaan dari loket mana pun
       pertama = false;
       el('mBerikut').innerHTML = (D.berikut || []).length ? D.berikut.map(function (b) {
         return '<div class="baris"><b>' + esc(b.nomor) + '</b><span>' + esc([b.nama, t.layanan !== false ? b.layanan : ''].filter(Boolean).join(' · ')) + '</span></div>';
@@ -524,7 +905,7 @@
           D.berikut = (D.berikut || []).filter(function (b) { return b.id !== r.ID; });
           render();
         }
-        if (m.tipe === 'sapa' && m.id) tampilSapa(m.id, m.detik, true); // v6.10
+        if (m.tipe === 'sapa' && m.id) tampilSapa(m.id, 0, true); // v6.10/6.11
         clearTimeout(segarJeda); segarJeda = setTimeout(tarik, 1500);
       };
     } catch (e) {}
@@ -536,13 +917,13 @@
     function isiPanel() {
       var s = layar();
       el('pTata').value = s.tata; el('pLebar').value = s.lebar || 0; el('pTinggi').value = s.tinggi || 0;
-      el('pX').value = s.x || 0; el('pY').value = s.y || 0; el('pSkala').value = s.skala; el('pSkalaLb').textContent = s.skala + '%'; el('pSuara').checked = !!s.suara; el('pPenuhOto').checked = s.penuhOto !== false;
+      el('pX').value = s.x || 0; el('pY').value = s.y || 0; el('pSkala').value = s.skala; el('pSkalaLb').textContent = s.skala + '%'; el('pSuara').checked = !!s.suara; el('pPenuhOto').checked = s.penuhOto !== false; el('pVo').checked = s.vo !== false;
     }
     function bacaPanel() {
       var n = function (id) { var v = Math.round(Number(el(id).value)); return isNaN(v) || v < 0 ? 0 : v; };
-      return { tata: el('pTata').value, lebar: n('pLebar'), tinggi: n('pTinggi'), x: n('pX'), y: n('pY'), skala: Math.min(200, Math.max(50, n('pSkala') || 100)), suara: el('pSuara').checked, penuhOto: el('pPenuhOto').checked };
+      return { tata: el('pTata').value, lebar: n('pLebar'), tinggi: n('pTinggi'), x: n('pX'), y: n('pY'), skala: Math.min(200, Math.max(50, n('pSkala') || 100)), suara: el('pSuara').checked, penuhOto: el('pPenuhOto').checked, vo: el('pVo').checked };
     }
-    ['pTata', 'pLebar', 'pTinggi', 'pX', 'pY', 'pSkala', 'pSuara', 'pPenuhOto'].forEach(function (id) {
+    ['pTata', 'pLebar', 'pTinggi', 'pX', 'pY', 'pSkala', 'pSuara', 'pPenuhOto', 'pVo'].forEach(function (id) {
       el(id).addEventListener('input', function () { el('pSkalaLb').textContent = el('pSkala').value + '%'; simpanLayar(bacaPanel()); });
       el(id).addEventListener('change', function () { simpanLayar(bacaPanel()); });
     });

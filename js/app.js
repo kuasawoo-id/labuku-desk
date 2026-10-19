@@ -1330,27 +1330,27 @@ function panggilAmbil(layananId) {
 }
 
 /**
- * v6.10: tombol "Selamat Datang" — pengunjung baru masuk: monitor menampilkan sapaan + tutorial ambil antrean
- * mandiri (45 detik) dan speaker menyapa. Optimistic: suara & monitor seketika, server mencatat di latar belakang
- * agar monitor di komputer lain ikut tampil.
+ * v6.10/6.11: tombol "Selamat Datang" — pengunjung baru masuk: monitor menampilkan layar sapaan 5 segmen
+ * (salam → pindai QR → isi data → tunggu → penutup). Suara = voice over MP3 per segmen yang diputar MONITOR
+ * (tanpa text-to-speech). Lama tampil = jumlah durasi 5 segmen. Optimistic: monitor seketika, server di latar belakang.
  */
-const SAPA_DETIK = 45;
-function kalimatSapa_(cfg) {
-  cfg = cfg || suaraCfg_();
-  return String(cfg.suara_sapa || SUARA_BAWAAN.suara_sapa).replace(/\{instansi\}/g, instansiNama()).replace(/\s+/g, ' ').trim();
-}
-function umumkanSapa_(cfgUji) {
-  if (!cfgUji && !suaraAktif_()) return;
-  const cfg = cfgUji || suaraCfg_();
-  const teks = kalimatSapa_(cfg);
-  window._panggilanTerakhir = teks;
-  bunyiBel_(cfg.suara_bel, suaraPerangkat_().vol, () => ucapkan_(teks, 1));
+const SAPA_SEGMEN = [
+  ['salam', 'Salam', 'Selamat datang + gambaran 3 langkah', 8, 'Selamat datang di {instansi}. Bapak dan Ibu bisa mengambil nomor antrean sendiri melalui HP, cukup dengan tiga langkah: pindai kode QR, isi data, lalu tunggu nomor Anda dipanggil.'],
+  ['qr', 'Pindai QR', 'Cara memindai kode QR dengan kamera HP', 10, 'Langkah pertama. Buka kamera HP Anda, arahkan ke kode QR di layar ini sampai muncul tautan, lalu ketuk tautan tersebut. Form antrean akan terbuka.'],
+  ['isi', 'Isi Data', 'Form antrean asli diisi pelan-pelan', 16, 'Langkah kedua. Isi NIK sesuai KTP, nama lengkap, dan nomor WhatsApp yang aktif. Pilih desa, tulis dusun, RT dan RW, lalu pilih layanan yang dituju. Setelah itu tekan tombol Ambil Nomor Antrean.'],
+  ['tunggu', 'Tunggu Dipanggil', 'Nomor di HP, lalu dipanggil di layar', 10, 'Langkah ketiga. Nomor antrean Anda tampil di HP. Simpan atau screenshot nomor tersebut, silakan duduk, dan perhatikan layar ini. Saat nomor dan nama Anda dipanggil, silakan menuju loket.'],
+  ['penutup', 'Penutup', 'Ringkasan semua langkah', 8, 'Terima kasih telah berkunjung ke {instansi}. Jika mengalami kesulitan, petugas kami siap membantu di meja PTSP.']
+];
+function sapaCfg_() {
+  const c = (window.AppState.config && window.AppState.config.sapa) || {};
+  const vo = c.vo || {}, durasi = Object.assign({}, ...SAPA_SEGMEN.map(([k, , , d]) => ({ [k]: d })), c.durasi || {});
+  const total = Math.ceil(SAPA_SEGMEN.reduce((a, [k]) => a + (vo[k] ? Number(vo[k].durasi) + 0.6 : Number(durasi[k])), 0));
+  return { vo, durasi, total };
 }
 function sapaPengunjungFo() {
-  const kunci = 'SAPA-' + Date.now();
-  umumkanSapa_();
-  kirimKeMonitor_({ tipe: 'sapa', id: kunci, detik: SAPA_DETIK });
-  showToast('Selamat Datang', 'Sapaan & cara ambil antrean tampil di monitor selama ' + SAPA_DETIK + ' detik.', 'success');
+  const kunci = 'SAPA-' + Date.now(), detik = sapaCfg_().total;
+  kirimKeMonitor_({ tipe: 'sapa', id: kunci, detik: detik });
+  showToast('Selamat Datang', 'Sapaan & cara ambil antrean tampil di monitor selama ' + detik + ' detik.', 'success');
   gsr(res => { if (!res || !res.success) showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); },
     err => showToast('Error', err.message || String(err), 'danger')).sapaPengunjung(kunci);
 }
@@ -3737,23 +3737,16 @@ function loadManajemenSuara() {
       </div>
       <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
       <div class="wa-preview" id="suaraPratinjauAmbil"></div>
-      <hr class="my-4">
-      <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
-        <div><h6 class="fw-bold mb-1">Kalimat sapaan "Selamat Datang"</h6><div class="small text-secondary mb-2">Diucapkan setelah bel saat petugas menekan <b>Selamat Datang</b> di Front Office. Monitor menampilkan cara ambil antrean selama ${SAPA_DETIK} detik. Penanda: {instansi}.</div></div>
-        <button class="btn btn-link btn-sm p-0" onclick="resetSuaraKalimat('sapa')">Kembalikan bawaan</button>
-      </div>
-      <textarea class="form-control" rows="4" maxlength="600" id="suaraSapa" oninput="pratinjauSuara()">${escapeHtml(c.suara_sapa)}</textarea>
-      <div class="small text-secondary mt-3 mb-1">Pratinjau:</div>
-      <div class="wa-preview" id="suaraPratinjauSapa"></div>
       <div class="d-flex gap-2 flex-wrap mt-3">
         <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan()"><i class="bi bi-volume-up"></i> Coba suara</button>
         <button class="btn btn-labuku-outline" onclick="cobaSuaraPengaturan('ambil')"><i class="bi bi-megaphone"></i> Coba ambil berkas</button>
-        <button class="btn btn-labuku-outline" onclick="umumkanSapa_(Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()))"><i class="bi bi-emoji-smile"></i> Coba sapaan</button>
         <button class="btn btn-labuku-primary" id="suaraSimpanBtn" onclick="simpanSuara()"><i class="bi bi-save"></i> Simpan</button>
       </div>
       <div class="small text-secondary mt-2">Jenis suara, kecepatan, nada & volume diatur di tiap komputer: Front Office → ikon pengatur.</div>
-    </div>`;
+    </div>
+    <div class="lb-card mb-3" style="max-width:820px;" id="voSapaBox"></div>`;
   pratinjauSuara();
+  renderVoSapa(); // v6.11
 }
 function bacaFormSuara_() {
   return {
@@ -3762,8 +3755,7 @@ function bacaFormSuara_() {
     suara_bel: document.getElementById('suaraBel').value,
     suara_ulang: document.getElementById('suaraUlang').value,
     suara_kalimat_ambil: document.getElementById('suaraKalimatAmbil').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim(),
-    suara_tujuan_ambil: document.getElementById('suaraTujuanAmbil').value.replace(/\s+/g, ' ').trim(),
-    suara_sapa: document.getElementById('suaraSapa').value.replace(CR_RE, '').replace(/\s+/g, ' ').trim()
+    suara_tujuan_ambil: document.getElementById('suaraTujuanAmbil').value.replace(/\s+/g, ' ').trim()
   };
 }
 function pratinjauSuara() {
@@ -3771,8 +3763,6 @@ function pratinjauSuara() {
   if (el) el.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
   const elA = document.getElementById('suaraPratinjauAmbil');
   if (elA) elA.textContent = kalimatPanggilan_(CONTOH_PANGGIL, Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()), 'ambil');
-  const elS = document.getElementById('suaraPratinjauSapa');
-  if (elS) elS.textContent = kalimatSapa_(Object.assign({}, SUARA_BAWAAN, bacaFormSuara_()));
 }
 function sisipSuaraPh(ph, targetId) {
   const ta = document.getElementById(targetId || 'suaraKalimat');
@@ -3785,7 +3775,6 @@ function sisipSuaraPh(ph, targetId) {
 }
 function resetSuaraKalimat(jenis) {
   if (jenis === 'ambil') document.getElementById('suaraKalimatAmbil').value = SUARA_BAWAAN.suara_kalimat_ambil;
-  else if (jenis === 'sapa') document.getElementById('suaraSapa').value = SUARA_BAWAAN.suara_sapa;
   else document.getElementById('suaraKalimat').value = SUARA_BAWAAN.suara_kalimat;
   pratinjauSuara();
 }
@@ -3796,7 +3785,6 @@ function simpanSuara() {
   if (!obj.suara_tujuan) obj.suara_tujuan = SUARA_BAWAAN.suara_tujuan;
   if (!obj.suara_kalimat_ambil) obj.suara_kalimat_ambil = SUARA_BAWAAN.suara_kalimat_ambil; // v6.9
   if (!obj.suara_tujuan_ambil) obj.suara_tujuan_ambil = SUARA_BAWAAN.suara_tujuan_ambil;
-  if (!obj.suara_sapa) obj.suara_sapa = SUARA_BAWAAN.suara_sapa; // v6.10
   const btn = document.getElementById('suaraSimpanBtn');
   btn.disabled = true;
   gsr(res => {
@@ -3807,6 +3795,124 @@ function simpanSuara() {
       showToast('Berhasil', 'Suara panggilan disimpan untuk semua perangkat.', 'success');
     } else showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger');
   }, err => { btn.disabled = false; showToast('Error', err.message || err, 'danger'); }).saveSettings(obj);
+}
+
+/* ---------- v6.11: voice over MP3 layar sapaan "Selamat Datang" (5 segmen) ----------
+ * MP3 disimpan di Drive (server); browser menyimpan salinannya di IndexedDB "labuku_vo" (dipakai bersama monitor.html),
+ * jadi tiap MP3 cukup diunduh sekali per komputer. Durasi dibaca dari berkas saat diunggah. */
+let _voDb = null;
+function voDb_() {
+  return new Promise((ok, gagal) => {
+    if (_voDb) return ok(_voDb);
+    if (!window.indexedDB) return gagal(new Error('IndexedDB tidak tersedia'));
+    const r = indexedDB.open('labuku_vo', 1);
+    r.onupgradeneeded = () => r.result.createObjectStore('mp3');
+    r.onsuccess = () => { _voDb = r.result; ok(_voDb); };
+    r.onerror = () => gagal(r.error);
+  });
+}
+function voAmbil_(id) { return voDb_().then(db => new Promise(ok => { const q = db.transaction('mp3').objectStore('mp3').get(id); q.onsuccess = () => ok(q.result || null); q.onerror = () => ok(null); })).catch(() => null); }
+function voSimpan_(id, blob) { return voDb_().then(db => { db.transaction('mp3', 'readwrite').objectStore('mp3').put(blob, id); }).catch(() => {}); }
+function durasiMp3_(file) {
+  return new Promise((ok, gagal) => {
+    const url = URL.createObjectURL(file), a = new Audio();
+    const selesai = (v, e) => { URL.revokeObjectURL(url); e ? gagal(e) : ok(v); };
+    a.preload = 'metadata';
+    a.onloadedmetadata = () => (isFinite(a.duration) && a.duration > 0) ? selesai(a.duration) : selesai(null, new Error('Durasi MP3 tidak terbaca.'));
+    a.onerror = () => selesai(null, new Error('Berkas tidak bisa diputar. Pastikan formatnya MP3.'));
+    a.src = url;
+  });
+}
+function fmtDetik_(d) { d = Math.round(Number(d) || 0); return d >= 60 ? Math.floor(d / 60) + ' mnt ' + (d % 60) + ' dtk' : d + ' dtk'; }
+function renderVoSapa() {
+  const box = document.getElementById('voSapaBox');
+  if (!box) return;
+  const c = sapaCfg_();
+  box.innerHTML = `
+    <div class="d-flex justify-content-between align-items-start gap-2 flex-wrap">
+      <div><h6 class="fw-bold mb-1">Voice over layar "Selamat Datang" (5 segmen)</h6>
+        <div class="small text-secondary mb-2">Unggah satu MP3 per segmen (maks. 4 MB). Lama tampil tiap segmen otomatis mengikuti panjang MP3-nya. Segmen tanpa MP3 tampil tanpa suara selama durasi bawaan. Suara diputar oleh <b>layar monitor</b>, tidak memakai suara robot (text-to-speech).</div></div>
+      <span class="badge-status badge-model" id="voTotal">Total ${fmtDetik_(c.total)}</span>
+    </div>
+    <div class="table-wrap"><table class="lb-table">
+      <thead><tr><th>Segmen</th><th>Voice over</th><th style="width:150px;">Tanpa MP3</th><th style="text-align:right;">Aksi</th></tr></thead>
+      <tbody>${SAPA_SEGMEN.map(([k, lb, ket, , naskah], i) => {
+        const v = c.vo[k];
+        return `<tr data-seg="${k}">
+          <td><div class="fw-semibold">${i + 1}. ${lb}</div><div class="small text-secondary">${ket}</div>
+            <details class="small mt-1"><summary class="text-secondary">Naskah saran</summary><div class="wa-preview mt-1">${escapeHtml(naskah.replace(/\{instansi\}/g, instansiNama()))}</div></details></td>
+          <td>${v ? `<div class="small"><i class="bi bi-file-earmark-music"></i> ${escapeHtml(v.nama || 'voice over.mp3')}</div><div class="small text-secondary">${fmtDetik_(v.durasi)}</div>` : '<span class="small text-secondary">Belum ada</span>'}</td>
+          <td><div class="input-group input-group-sm"><input type="number" class="form-control vo-durasi" data-seg="${k}" min="3" max="120" value="${escapeHtml(c.durasi[k])}" ${v ? 'disabled title="Mengikuti panjang MP3"' : ''}><span class="input-group-text">dtk</span></div></td>
+          <td style="text-align:right;white-space:nowrap;">
+            <input type="file" accept="audio/mpeg,.mp3" class="d-none" id="voFile_${k}" onchange="unggahVoSapa('${k}', this)">
+            ${v ? `<button class="btn btn-labuku-outline btn-sm-pill" onclick="putarVoSapa('${k}', this)"><i class="bi bi-play-fill"></i> Putar</button>` : ''}
+            <button class="btn ${v ? 'btn-labuku-outline' : 'btn-labuku-primary'} btn-sm-pill" id="voBtn_${k}" onclick="document.getElementById('voFile_${k}').click()"><i class="bi bi-upload"></i> ${v ? 'Ganti' : 'Unggah MP3'}</button>
+            ${v ? `<button class="btn btn-ikon-aksi" title="Hapus voice over" aria-label="Hapus voice over" onclick="hapusVoSapaUi('${k}')"><i class="bi bi-trash"></i></button>` : ''}</td>
+        </tr>`;
+      }).join('')}</tbody></table></div>
+    <div class="d-flex gap-2 flex-wrap mt-3">
+      <button class="btn btn-labuku-outline" id="voDurasiBtn" onclick="simpanDurasiSapaUi()"><i class="bi bi-save"></i> Simpan durasi tanpa MP3</button>
+      <button class="btn btn-labuku-primary" onclick="sapaPengunjungFo()"><i class="bi bi-display"></i> Tampilkan di monitor sekarang</button>
+    </div>
+    <div class="small text-secondary mt-2">Tips: rekam di tempat tenang, ekspor MP3 mono 64–128 kbps (±0,5–1 MB per menit). Agar suara keluar, layar monitor perlu diklik sekali setelah dibuka (aturan browser).</div>`;
+}
+let _voAudio = null;
+function putarVoSapa(seg, btn) {
+  const v = sapaCfg_().vo[seg];
+  if (!v) return;
+  if (_voAudio) { _voAudio.pause(); _voAudio = null; }
+  const mainkan = blob => { _voAudio = new Audio(URL.createObjectURL(blob)); _voAudio.play().catch(() => {}); };
+  voAmbil_(v.id).then(blob => {
+    if (blob) return mainkan(blob);
+    if (btn) btn.disabled = true;
+    gsr(res => {
+      if (btn) btn.disabled = false;
+      if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+      const bin = atob(res.data.base64), arr = new Uint8Array(bin.length);
+      for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i);
+      const b = new Blob([arr], { type: 'audio/mpeg' }); voSimpan_(v.id, b); mainkan(b);
+    }, err => { if (btn) btn.disabled = false; showToast('Error', err.message || String(err), 'danger'); }).getVoSapa(seg);
+  });
+}
+async function unggahVoSapa(seg, input) {
+  const f = input.files && input.files[0];
+  input.value = '';
+  if (!f) return;
+  if (!/\.mp3$/i.test(f.name) && f.type !== 'audio/mpeg') { showToast('Peringatan', 'Pilih berkas MP3.', 'warning'); return; }
+  if (f.size > 4 * 1024 * 1024) { showToast('Peringatan', 'Berkas terlalu besar (maks. 4 MB). Ekspor ulang dengan bitrate lebih kecil.', 'warning'); return; }
+  let durasi;
+  try { durasi = await durasiMp3_(f); } catch (e) { showToast('Gagal', e.message, 'danger'); return; }
+  const btn = document.getElementById('voBtn_' + seg);
+  if (btn) { btn.disabled = true; btn.innerHTML = '<span class="spinner-inline"></span> Mengunggah...'; }
+  const b64 = await new Promise(ok => { const r = new FileReader(); r.onload = () => ok(String(r.result).split(',')[1] || ''); r.readAsDataURL(f); });
+  gsr(res => {
+    if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); renderVoSapa(); return; }
+    window.AppState.config.sapa = res.data;
+    saveAppStateCache();
+    const v = res.data.vo && res.data.vo[seg];
+    if (v) voSimpan_(v.id, f); // salinan lokal: Putar & monitor di komputer ini tidak perlu mengunduh lagi
+    renderVoSapa();
+    showToast('Berhasil', 'Voice over "' + SAPA_SEGMEN.find(x => x[0] === seg)[1] + '" disimpan (' + fmtDetik_(durasi) + ').', 'success');
+  }, err => { showToast('Error', err.message || String(err), 'danger'); renderVoSapa(); }).simpanVoSapa(seg, b64, f.name, Math.round(durasi * 10) / 10);
+}
+function hapusVoSapaUi(seg) {
+  if (!confirm('Hapus voice over segmen ini? Segmen akan tampil tanpa suara.')) return;
+  gsr(res => {
+    if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+    window.AppState.config.sapa = res.data; saveAppStateCache(); renderVoSapa();
+    showToast('Berhasil', 'Voice over dihapus.', 'success');
+  }, err => showToast('Error', err.message || String(err), 'danger')).hapusVoSapa(seg);
+}
+function simpanDurasiSapaUi() {
+  const obj = {};
+  document.querySelectorAll('.vo-durasi:not([disabled])').forEach(el => { obj[el.dataset.seg] = Math.min(120, Math.max(3, Math.round(Number(el.value)) || 8)); });
+  const btn = document.getElementById('voDurasiBtn'); if (btn) btn.disabled = true;
+  gsr(res => {
+    if (btn) btn.disabled = false;
+    if (!res || !res.success) { showToast('Gagal', (res && res.message) || 'Server tidak merespons.', 'danger'); return; }
+    window.AppState.config.sapa = res.data; saveAppStateCache(); renderVoSapa();
+    showToast('Berhasil', 'Durasi segmen disimpan.', 'success');
+  }, err => { if (btn) btn.disabled = false; showToast('Error', err.message || String(err), 'danger'); }).simpanDurasiSapa(obj);
 }
 
 /* ---------- v6.8 Tab: Monitor (isi layar monitor antrean — berlaku untuk semua layar) ---------- */
@@ -3938,3 +4044,83 @@ function submitPengaturan() {
     .withFailureHandler(err => showToast('Error', err.message || err, 'danger'))
     .saveSettings(obj);
 }
+
+/* ---------- v6.11: bar geser kanan-kiri mengambang untuk tabel lebar (desktop sempit / diperbesar) ----------
+ * Tampil hanya bila tabel di halaman aktif lebih lebar dari kotaknya dan sedang terlihat di layar.
+ * Bar menempel di bawah layar (di atas navigasi bawah bila ada), selebar tabel, + tombol ‹ › di kiri-kanan. */
+(function () {
+  let bar = null, jalur = null, isi = null, kiri = null, kanan = null, wrap = null, antre = false;
+  function buat() {
+    bar = document.createElement('div');
+    bar.className = 'bar-geser'; bar.id = 'barGeser';
+    bar.innerHTML = '<button type="button" aria-label="Geser ke kiri" title="Geser ke kiri"><i class="bi bi-chevron-left"></i></button>' +
+      '<div class="bg-jalur" aria-label="Geser tabel"><div class="bg-isi"></div></div>' +
+      '<button type="button" aria-label="Geser ke kanan" title="Geser ke kanan"><i class="bi bi-chevron-right"></i></button>';
+    document.body.appendChild(bar);
+    jalur = bar.querySelector('.bg-jalur'); isi = bar.querySelector('.bg-isi');
+    [kiri, kanan] = bar.querySelectorAll('button');
+    const geser = arah => { if (wrap) wrap.scrollBy({ left: arah * Math.max(160, wrap.clientWidth * 0.6), behavior: 'smooth' }); };
+    kiri.addEventListener('click', () => geser(-1));
+    kanan.addEventListener('click', () => geser(1));
+    // sinkron dua arah; abaikan selisih kecil supaya geser halus (smooth) tidak saling memotong
+    jalur.addEventListener('scroll', () => {
+      if (!wrap) return;
+      const k = rasio(), target = jalur.scrollLeft * k;
+      if (Math.abs(target - wrap.scrollLeft) > k + 1) wrap.scrollLeft = target;
+      tombol();
+    });
+  }
+  // perbandingan jarak geser tabel : jarak geser bar
+  function rasio() { return Math.max(0, wrap.scrollWidth - wrap.clientWidth) / Math.max(1, jalur.scrollWidth - jalur.clientWidth); }
+  function kelas(el, k, ya) { if (el && el.classList.contains(k) !== ya) el.classList.toggle(k, ya); } // hanya ubah bila beda (hindari putaran MutationObserver)
+  function tombol() {
+    if (!wrap) return;
+    kiri.disabled = wrap.scrollLeft <= 1;
+    kanan.disabled = wrap.scrollLeft >= wrap.scrollWidth - wrap.clientWidth - 1;
+  }
+  function onWrapScroll() {
+    if (!jalur) return;
+    const target = this.scrollLeft / (rasio() || 1);
+    if (Math.abs(target - jalur.scrollLeft) > 1) jalur.scrollLeft = target;
+    tombol();
+  }
+  function cari() {
+    if (window.innerWidth < 768) return null;
+    const vh = window.innerHeight;
+    return Array.from(document.querySelectorAll('.content-section.active .table-wrap')).find(w => {
+      if (w.scrollWidth <= w.clientWidth + 40) return false; // selisih kecil: cukup bar bawaan tabel
+      const r = w.getBoundingClientRect();
+      return r.width > 0 && r.top < vh - 60 && r.bottom > 80;
+    }) || null;
+  }
+  function atur() {
+    antre = false;
+    if (!bar) buat();
+    const w = cari();
+    if (w !== wrap) {
+      if (wrap) { wrap.removeEventListener('scroll', onWrapScroll); kelas(wrap, 'geser-aktif', false); }
+      wrap = w;
+      if (wrap) { wrap.addEventListener('scroll', onWrapScroll, { passive: true }); kelas(wrap, 'geser-aktif', true); }
+    }
+    if (!wrap) { kelas(bar, 'tampil', false); return; }
+    const r = wrap.getBoundingClientRect();
+    const nav = document.getElementById('bottomNav');
+    const bawahNav = nav && getComputedStyle(nav).display !== 'none' ? nav.getBoundingClientRect().height : 0;
+    bar.style.left = Math.max(8, r.left) + 'px';
+    bar.style.width = Math.min(r.width, window.innerWidth - Math.max(8, r.left) - 8) + 'px';
+    bar.style.bottom = (bawahNav + 10) + 'px';
+    kelas(bar, 'tampil', true);
+    // lebar isi jalur = rasio lebar tabel terhadap kotaknya (agar panjang pegangan sebanding)
+    isi.style.width = Math.round(jalur.clientWidth * wrap.scrollWidth / Math.max(1, wrap.clientWidth)) + 'px';
+    jalur.scrollLeft = wrap.scrollLeft / (rasio() || 1);
+    tombol();
+  }
+  function jadwal() { if (!antre) { antre = true; requestAnimationFrame(atur); } }
+  window.aturBarGeser = jadwal;
+  window.addEventListener('resize', jadwal);
+  window.addEventListener('scroll', jadwal, { passive: true });
+  document.addEventListener('DOMContentLoaded', () => {
+    new MutationObserver(jadwal).observe(document.body, { childList: true, subtree: true, attributes: true, attributeFilter: ['class'] });
+    jadwal();
+  });
+})();

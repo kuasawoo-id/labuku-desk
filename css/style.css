@@ -817,3 +817,25 @@ table.lb-table tbody td { padding: .9rem 1.1rem; }
   #foSapaBtn .label-hp { display: none; }
   #foSapaBtn { flex: 0 0 auto !important; }
 }
+/* v6.11: desktop sempit (jendela dibagi dua / diperbesar) — tabel bisa digeser kanan-kiri, kolom tidak dipaksa menyempit */
+@media (min-width: 768px) {
+  .table-wrap { overflow-x: auto; overflow-y: hidden; scrollbar-width: thin; }
+  .table-wrap > table.lb-table { min-width: 640px; }
+  #foTableBox > table.lb-table { min-width: 900px; }
+  #boTableBox > table.lb-table { min-width: 1020px; }
+  #foTableBox td.fo-actions { white-space: nowrap; }
+  .table-wrap.geser-aktif { scrollbar-width: none; }
+  .table-wrap.geser-aktif::-webkit-scrollbar { display: none; }
+  .topbar-search { min-width: 0; }
+  .topbar-search input { min-width: 0; width: 100%; }
+}
+.bar-geser { position: fixed; z-index: 1025; display: none; align-items: center; gap: .4rem; padding: .3rem .4rem; background: var(--bg-card); border: 1px solid var(--outline); border-radius: 12px; box-shadow: 0 6px 22px rgba(16,24,40,.16); }
+.bar-geser.tampil { display: flex; }
+.bar-geser button { flex: 0 0 auto; width: 34px; height: 30px; border: 1px solid var(--outline); background: var(--bg-surface); color: var(--text-primary); border-radius: 8px; display: flex; align-items: center; justify-content: center; padding: 0; }
+.bar-geser button:hover:not(:disabled) { background: var(--primary, #1B4332); color: #fff; border-color: var(--primary, #1B4332); }
+.bar-geser button:disabled { opacity: .35; }
+.bar-geser .bg-jalur { flex: 1; min-width: 0; overflow-x: auto; overflow-y: hidden; height: 16px; scrollbar-width: auto; scrollbar-color: #52796f transparent; }
+.bar-geser .bg-jalur::-webkit-scrollbar { height: 12px; }
+.bar-geser .bg-jalur::-webkit-scrollbar-thumb { background: #52796f; border-radius: 8px; }
+.bar-geser .bg-jalur::-webkit-scrollbar-track { background: var(--bg-surface); border-radius: 8px; }
+.bar-geser .bg-isi { height: 1px; }
