@@ -33,6 +33,13 @@
     .btn-kontak { background: #fff; color: #1B4332; border: 2px solid #1B4332; border-radius: 10px; font-weight: 600; padding: .7rem; }
     .btn-kontak:hover { background: #F0FDF4; color: #1B4332; }
     .langkah { font-size: .85rem; color: #475569; text-align: center; margin: .25rem 0 .6rem; }
+    /* v6.12: hitung mundur → WhatsApp KUA terbuka sendiri */
+    .wa-hitung { background: #F0FDF4; border: 1px solid rgba(27,67,50,.25); border-radius: 14px; padding: .9rem 1rem; margin: 1rem 0 .75rem; text-align: center; }
+    .wa-hitung b { font-size: 1.05rem; color: #1B4332; }
+    .wa-hitung .bar { height: 6px; background: #DCFCE7; border-radius: 999px; overflow: hidden; margin: .6rem 0 .5rem; }
+    .wa-hitung .bar i { display: block; height: 100%; width: 100%; background: #1B4332; transition: width 1s linear; }
+    .wa-hitung .tunda { background: none; border: 0; color: #475569; text-decoration: underline; font-size: .85rem; }
+    .tiket-ok { font-size: .85rem; color: #166534; text-align: center; margin: .5rem 0 0; }
     #fNama { text-transform: uppercase; }
     /* v6.1 HP: huruf input 16px (iOS tidak memperbesar layar), daftar layanan lebih mudah diketuk */
     @media (max-width: 575.98px) {
@@ -75,7 +82,7 @@
           <div class="pilihan" id="fInfo"></div>
           <input class="form-control" id="fCari" autocomplete="off" placeholder="Cari layanan...">
           <div class="lpx-box" id="fList"></div>
-          <input class="form-control mt-2" id="fLain" maxlength="80" style="display:none;" placeholder="Tulis layanan yang dibutuhkan">
+          <input class="form-control mt-2" id="fLain" maxlength="80" style="display:none;" placeholder="Tulis layanan lainnya yang dibutuhkan">
         </div>
         <div class="hp" aria-hidden="true"><label>Website <input id="fWebsite" tabindex="-1" autocomplete="off"></label></div>
         <div id="fErr" class="err mb-2"></div>
@@ -97,10 +104,17 @@
       </div>
       <p class="text-center text-secondary small mt-3">Screenshot layar ini, lalu tunggu panggilan. Bawa berkas persyaratan asli.</p>
       <!-- v6.6: simpan nomor KUA di HP dulu, lalu kirim WA (tidak pindah otomatis) -->
+      <!-- v6.12: gambar tiket tersimpan otomatis; WhatsApp KUA terbuka sendiri setelah hitung mundur (tanpa tombol Simpan Kontak) -->
+      <p class="tiket-ok" id="tGambarInfo" style="display:none;"></p>
+      <a class="btn btn-kontak w-100 mt-2 mb-2" id="tGambar" href="#" download="Tiket-Antrean.png">Simpan gambar tiket</a>
       <div id="tKuaBox" style="display:none;">
-        <p class="langkah">Simpan nomor WhatsApp KUA agar informasi layanan dari kami sampai ke HP Anda.</p>
-        <a class="btn btn-kontak w-100 mb-2" id="tKontak" href="#" download="Kontak KUA.vcf">1. Simpan Kontak KUA</a>
-        <a class="btn btn-go w-100 mb-2" id="tWaKua" href="#"><span id="tWaKuaTeks">2. Kirim WA ke KUA</span></a>
+        <div class="wa-hitung" id="tHitung">
+          <b>WhatsApp KUA terbuka dalam <span id="tDetik">6</span> detik…</b>
+          <div class="bar"><i id="tBar"></i></div>
+          <div class="small text-secondary">Pesan berisi nomor antrean Anda sudah disiapkan — tinggal tekan <b>Kirim</b> di WhatsApp.</div>
+          <button type="button" class="tunda mt-1" id="tTunda">Tunda dulu</button>
+        </div>
+        <a class="btn btn-go w-100 mb-2" id="tWaKua" href="#"><span id="tWaKuaTeks">Kirim WA ke KUA sekarang</span></a>
       </div>
       <button class="btn btn-outline-secondary w-100" type="button" onclick="resetForm()">Daftar untuk orang lain</button>
     </div>
@@ -159,7 +173,7 @@
     var PICKER = null;
     var OPTS = null;
     var PILIH = [];
-    var LAIN = { id: '__LAIN__', nama: 'Lain-lain (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 };
+    var LAIN = { id: '__LAIN__', nama: 'Layanan Lainnya (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 }; // v6.12: "Layanan Lainnya" 
 
     /* v6.6: layanan yang sudah dipilih tampil sebagai chip (bisa dihapus) dan tidak muncul lagi di daftar */
     function saringPicker() {
@@ -223,7 +237,9 @@
           el('formBox').style.display = 'none';
           el('ticketBox').style.display = 'block';
           window.scrollTo(0, 0);
-          waKeKua(res.data, data.noHp);
+          simpanTiketTerakhir(res.data, data.noHp); // v6.12: tiket tetap ada bila halaman dibuka lagi setelah WhatsApp
+          siapkanGambarTiket(res.data, true);
+          waKeKua(res.data, data.noHp, true);
         })
         .withFailureHandler(function (err) {
           btn.disabled = false; btn.textContent = 'Ambil Nomor Antrean';
@@ -232,32 +248,109 @@
         .daftarAntreanPublik(data);
     }
 
-    /* v6.6: setelah tiket tampil → tombol "1. Simpan Kontak KUA" (kartu kontak .vcf → layar Tambah kontak di HP)
-       dan "2. Kirim WA ke KUA" (pesan dari template "Pengunjung → WA KUA"). Tidak pindah halaman otomatis. */
-    var KONTAK_URL = null;
-    function teksVcard(s) { return String(s || '').replace(/\\/g, '\\\\').replace(/([,;])/g, '\\$1').replace(/\r?\n/g, ' '); }
-    function waKeKua(d, hp) {
+    /* v6.12: setelah tiket tampil → gambar tiket (PNG) tersimpan otomatis, lalu hitung mundur 6 detik dan
+       WhatsApp ke KUA terbuka sendiri dengan pesan berisi nomor antrean (wa.me). Pengunjung tinggal menekan Kirim.
+       Tiket disimpan di HP (localStorage) supaya tetap tampil saat kembali dari WhatsApp. */
+    var WA_DETIK = 6, HITUNG = null, GAMBAR_URL = null;
+    function urlWaKua(d, hp) {
       var nomor = FORM_DATA && FORM_DATA.waKua;
-      if (!nomor) return;
+      if (!nomor) return '';
       var instansi = FORM_DATA.instansi || 'KUA';
       var vars = { nama: d.nama, nomor: d.nomor, layanan: d.layanan, tanggal: d.tanggal, hp: hp, sisa: d.sisa, instansi: instansi };
       var tpl = FORM_DATA.waKuaTpl || 'Nomor antrean: {nomor}\nNama: {nama}\nLayanan: {layanan}';
       var pesan = tpl.replace(/\{(\w+)\}/g, function (m, k) { return vars[k] !== undefined && vars[k] !== null ? String(vars[k]) : m; });
-      el('tWaKua').href = 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pesan);
-      var vcf = ['BEGIN:VCARD', 'VERSION:3.0', 'N:;' + teksVcard(instansi) + ';;;', 'FN:' + teksVcard(instansi), 'ORG:' + teksVcard(instansi),
-        'TEL;TYPE=CELL,VOICE:+' + nomor, 'NOTE:' + teksVcard('WhatsApp layanan ' + instansi), 'END:VCARD'].join('\r\n') + '\r\n';
-      try {
-        if (KONTAK_URL) URL.revokeObjectURL(KONTAK_URL);
-        KONTAK_URL = URL.createObjectURL(new Blob([vcf], { type: 'text/vcard;charset=utf-8' }));
-        el('tKontak').href = KONTAK_URL;
-      } catch (e) { el('tKontak').href = 'data:text/vcard;charset=utf-8,' + encodeURIComponent(vcf); }
-      el('tKontak').setAttribute('download', instansi.replace(/[^\w\s.-]/g, '').trim() + '.vcf');
+      return 'https://wa.me/' + nomor + '?text=' + encodeURIComponent(pesan);
+    }
+    function hentikanHitung() { clearInterval(HITUNG); HITUNG = null; }
+    function bukaWa(url) { hentikanHitung(); el('tHitung').style.display = 'none'; window.__waDibuka = url; window.location.href = url; }
+    function waKeKua(d, hp, otomatis) {
+      var url = urlWaKua(d, hp);
+      hentikanHitung();
+      if (!url) return;
+      el('tWaKua').href = url;
+      el('tWaKua').onclick = function (ev) { ev.preventDefault(); bukaWa(url); };
       el('tKuaBox').style.display = '';
+      if (!otomatis) { el('tHitung').style.display = 'none'; return; }
+      var sisa = WA_DETIK;
+      el('tHitung').style.display = ''; el('tDetik').textContent = sisa;
+      var bar = el('tBar'); bar.style.transition = 'none'; bar.style.width = '100%'; void bar.offsetWidth; bar.style.transition = '';
+      el('tTunda').onclick = function () { hentikanHitung(); el('tHitung').style.display = 'none'; };
+      HITUNG = setInterval(function () {
+        sisa--; el('tDetik').textContent = Math.max(0, sisa);
+        bar.style.width = Math.max(0, sisa / WA_DETIK * 100) + '%';
+        if (sisa <= 0) bukaWa(url);
+      }, 1000);
+    }
+
+    /* Gambar tiket (PNG 1080×1350) — dibuat di HP, tidak perlu internet tambahan */
+    function bungkusTeks(ctx, teks, maks) {
+      var kata = String(teks || '').split(' '), baris = [], b = '';
+      kata.forEach(function (k) { var c = b ? b + ' ' + k : k; if (ctx.measureText(c).width > maks && b) { baris.push(b); b = k; } else b = c; });
+      if (b) baris.push(b);
+      return baris;
+    }
+    function gambarTiket(d) {
+      var W = 1080, H = 1350, c = document.createElement('canvas'); c.width = W; c.height = H;
+      var x = c.getContext('2d'), instansi = (FORM_DATA && FORM_DATA.instansi) || 'KUA';
+      x.fillStyle = '#F9FAF6'; x.fillRect(0, 0, W, H);
+      x.save(); x.beginPath(); if (x.roundRect) x.roundRect(60, 60, W - 120, H - 120, 48); else x.rect(60, 60, W - 120, H - 120); x.clip();
+      x.fillStyle = '#1B4332'; x.fillRect(60, 60, W - 120, H - 120);
+      x.fillStyle = '#D4A017'; x.fillRect(60, 60, W - 120, 18); x.restore();
+      x.textAlign = 'center'; x.fillStyle = '#D4A017'; x.font = '700 34px Inter, Arial, sans-serif'; x.fillText('LABUKU DESK', W / 2, 160);
+      x.fillStyle = '#ffffff'; x.font = '700 44px Inter, Arial, sans-serif';
+      bungkusTeks(x, instansi, W - 240).slice(0, 2).forEach(function (t, i) { x.fillText(t, W / 2, 225 + i * 54); });
+      x.globalAlpha = .8; x.font = '600 32px Inter, Arial, sans-serif'; x.fillText('NOMOR ANTREAN ANDA', W / 2, 380); x.globalAlpha = 1;
+      var nomor = d.tiket && d.tiket.length > 1 ? d.tiket.map(function (t) { return t.nomor; }).join(' · ') : String(d.nomor || '');
+      x.font = '800 ' + (nomor.length > 7 ? 110 : 200) + 'px Inter, Arial, sans-serif'; x.fillText(nomor, W / 2, nomor.length > 7 ? 520 : 570);
+      x.fillStyle = 'rgba(255,255,255,.12)'; x.fillRect(120, 650, W - 240, 470);
+      x.textAlign = 'left'; var y = 715;
+      [['Nama', d.nama], ['Layanan', d.layanan], ['Tanggal', d.tanggal], ['Antrean sebelum Anda', d.sisa + ' orang']].forEach(function (b) {
+        x.fillStyle = 'rgba(255,255,255,.7)'; x.font = '500 28px Inter, Arial, sans-serif'; x.fillText(b[0], 160, y); y += 44;
+        x.fillStyle = '#ffffff'; x.font = '700 36px Inter, Arial, sans-serif';
+        bungkusTeks(x, b[1], W - 320).slice(0, 2).forEach(function (t) { x.fillText(t, 160, y); y += 46; }); y += 22;
+      });
+      x.textAlign = 'center'; x.fillStyle = '#D4A017'; x.font = '600 30px Inter, Arial, sans-serif';
+      x.fillText('Tunggu panggilan · Bawa berkas persyaratan asli', W / 2, H - 140);
+      return c;
+    }
+    function siapkanGambarTiket(d, unduh) {
+      var a = el('tGambar'), nama = 'Tiket-Antrean-' + String(d.nomor || '').split(',')[0].trim().replace(/[^\w-]/g, '') + '.png';
+      try {
+        var c = gambarTiket(d);
+        c.toBlob(function (blob) {
+          if (!blob) return;
+          if (GAMBAR_URL) URL.revokeObjectURL(GAMBAR_URL);
+          GAMBAR_URL = URL.createObjectURL(blob);
+          a.href = GAMBAR_URL; a.setAttribute('download', nama);
+          if (unduh) {
+            try { a.click(); el('tGambarInfo').textContent = '✓ Gambar tiket tersimpan di HP (' + nama + ')'; el('tGambarInfo').style.display = ''; } catch (e) {}
+          }
+        }, 'image/png');
+      } catch (e) { a.style.display = 'none'; }
+    }
+    var KUNCI_TIKET = 'labuku_tiket_terakhir';
+    function simpanTiketTerakhir(d, hp) { try { localStorage.setItem(KUNCI_TIKET, JSON.stringify({ d: d, hp: hp, t: Date.now() })); } catch (e) {} }
+    /** Tiket hari ini tampil lagi bila pengunjung kembali dari WhatsApp (halaman dimuat ulang). */
+    function pulihkanTiket() {
+      try {
+        var j = JSON.parse(localStorage.getItem(KUNCI_TIKET) || 'null');
+        if (!j || !j.d || new Date(j.t).toDateString() !== new Date().toDateString()) return false;
+        var d = j.d;
+        el('tNum').textContent = d.tiket && d.tiket.length > 1 ? d.tiket.map(function (t) { return t.nomor; }).join(' · ') : d.nomor;
+        el('tNum').className = 'num' + (d.tiket && d.tiket.length > 1 ? ' kecil' : '');
+        el('tNama').textContent = d.nama; el('tLayanan').textContent = d.layanan; el('tTgl').textContent = d.tanggal; el('tSisa').textContent = d.sisa + ' orang';
+        el('formBox').style.display = 'none'; el('ticketBox').style.display = 'block';
+        siapkanGambarTiket(d, false);
+        waKeKua(d, j.hp, false);
+        return true;
+      } catch (e) { return false; }
     }
 
     function resetForm() {
       el('fForm').reset();
       el('fLain').style.display = 'none'; el('tKuaBox').style.display = 'none';
+      hentikanHitung(); el('tGambarInfo').style.display = 'none';
+      try { localStorage.removeItem(KUNCI_TIKET); } catch (e) {}
       PILIH = []; segarkanPilihan();
       if (PICKER) PICKER.render('');
       if (WIL) WIL.setMode('utama');
@@ -272,6 +365,7 @@
         FORM_DATA = data || null;
         btn.disabled = false; btn.textContent = 'Ambil Nomor Antrean';
         initForm();
+        if (FORM_DATA) pulihkanTiket(); // v6.12
       }
       if (!window.LABUKU_GAS_SIAP || !window.LABUKU_GAS_SIAP()) { selesai(null); return; }
       google.script.run

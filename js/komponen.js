@@ -193,7 +193,7 @@ window.LabukuUI = (function () {
       });
       box.scrollTop = st;
     }
-    /* v6.4: pilihan "Lain-lain (tulis sendiri)" selalu ada (di bawah Teratas, atau di akhir hasil cari) */
+    /* v6.4/6.12: pilihan "Layanan Lainnya (tulis sendiri)" selalu ada (di bawah Teratas, atau di akhir hasil cari) */
     function tambahLain() {
       if (!opts.lain) return;
       var b = itemBtn(opts.lain, false);

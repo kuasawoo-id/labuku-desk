@@ -284,6 +284,8 @@
     .L-tegak .sp-adegan { grid-template-columns: 1fr !important; grid-auto-rows: min-content; align-content: center; justify-items: center; padding: 0; gap: calc(var(--u) * 2.4); }
     .L-tegak .sp-salam .sp-tiga, .L-tegak .sp-tutup .sp-tiga { width: 100%; }
     .L-tegak .sp-qr-adegan .sp-hp { display: none; }
+    .L-tegak .sp-qr-adegan .sp-qrbox { margin-bottom: calc(var(--u) * 3); }
+    .L-tegak .sp-poin li.aktif { transform: none; }
     .L-tegak .sp-kanan, .L-tegak .sp-teks { width: 100%; }
     .L-tegak .sp-tv { align-self: center; width: calc(var(--u) * 30); }
     .L-tegak .sp-hp { width: calc(var(--u) * 16); height: calc(var(--u) * 31); }
@@ -972,6 +974,17 @@
     window.addEventListener('resize', aturHint);
     document.addEventListener('mousemove', aturHint);
     aturHint();
+
+    /* v6.12: langsung layar penuh tanpa klik.
+       (1) Dibuka dari tombol "Buka Monitor": jendela LABUKU Desk meneruskan izin layar penuh (postMessage delegate: 'fullscreen').
+       (2) Komputer yang dipasangi kebijakan AutomaticFullscreenAllowedForUrls (file .reg): layar penuh otomatis saat dimuat.
+       Bila keduanya tidak tersedia, tetap berlaku "klik sekali di mana saja". */
+    window.addEventListener('message', function (ev) {
+      if (ev.origin !== location.origin || !ev.data || ev.data.tipe !== 'labuku-penuh') return;
+      if (layar().penuhOto !== false) masukPenuh();
+    });
+    try { if (window.opener && !window.opener.closed) window.opener.postMessage({ tipe: 'monitor-siap' }, location.origin); } catch (e) {}
+    if (layar().penuhOto !== false) setTimeout(masukPenuh, 300);
 
     terapkanLayar();
     tarik();

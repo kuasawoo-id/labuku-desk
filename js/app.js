@@ -1056,7 +1056,7 @@ function foStatusInfo(r) {
 }
 
 /** v6.4: layanan "Lain-lain" — nama layanan diisi sendiri; selesai di Front Office (model Langsung). */
-const KATALOG_LAIN = { ID: '__LAIN__', Kategori: 'Layanan Lain-lain', NamaLayanan: 'Lain-lain', ModelHasil: 'Langsung', PersyaratanJSON: '', FieldJSON: '' };
+const KATALOG_LAIN = { ID: '__LAIN__', Kategori: 'Layanan Lain-lain', NamaLayanan: 'Layanan Lainnya', ModelHasil: 'Langsung', PersyaratanJSON: '', FieldJSON: '' };
 function katalogById(id) { return id === KATALOG_LAIN.ID ? KATALOG_LAIN : ((window.AppState.katalog || []).find(k => k.ID === id) || null); }
 function kategoriOf(row) {
   const k = katalogById(row.KatalogID) || (window.AppState.katalog || []).find(x => x.NamaLayanan === (row.LayananNama || row.JenisLayanan));
@@ -1227,7 +1227,7 @@ function renderFoTable() {
             ${showTgl ? `<td class="kr-meta" style="white-space:nowrap;">${fmtDate(r.Waktu)}</td>` : ''}
             <td class="kr-nama"><div class="fw-semibold">${escapeHtml(namaKapital(r.PemohonNama))}</div>
               <div class="small text-secondary">${r.Sumber === 'Online' ? '<span class="badge-status badge-online me-1">Online</span>' : ''}${escapeHtml(r.NoHP || '')}</div></td>
-            <td class="kr-layanan">${escapeHtml(r.LayananNama)}<div class="small text-secondary">${escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
+            <td class="kr-layanan">${escapeHtml(r.LayananNama)}<div class="small text-secondary">${r.KatalogID === KATALOG_LAIN.ID ? '<span class="badge-status badge-model">Layanan Lainnya</span> isian pengunjung' : escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
             <td class="kr-status"><span class="badge-status ${st.cls}">${st.label}</span></td>
             <td class="fo-actions" style="text-align:right;">${aksi}</td>
           </tr>`;
@@ -1248,7 +1248,19 @@ function kirimKeMonitor_(pesan) {
   } catch (e) {}
 }
 
-/* v6.8: buka layar monitor; bila browser mendukung (Chrome/Edge), langsung ditaruh di monitor kedua. */
+/* v6.8: buka layar monitor; bila browser mendukung (Chrome/Edge), langsung ditaruh di monitor kedua.
+ * v6.12: langsung LAYAR PENUH tanpa klik — klik "Buka Monitor" diteruskan ke jendela monitor sebagai izin layar penuh
+ * (Fullscreen Capability Delegation, Chrome/Edge). Izin klik hanya berlaku ±5 detik, jadi dikirim begitu monitor siap. */
+let _monitorWin = null;
+window.addEventListener('message', ev => {
+  if (ev.origin !== location.origin || !ev.data || ev.data.tipe !== 'monitor-siap' || !_monitorWin || ev.source !== _monitorWin) return;
+  kirimIzinPenuh_(_monitorWin);
+});
+function kirimIzinPenuh_(w) {
+  if (!w || w.closed) return;
+  try { w.postMessage({ tipe: 'labuku-penuh' }, { targetOrigin: location.origin, delegate: 'fullscreen' }); }
+  catch (e) { try { w.postMessage({ tipe: 'labuku-penuh' }, location.origin); } catch (e2) {} }
+}
 async function bukaMonitor() {
   const url = new URL('monitor.html', location.href).href;
   let fitur = 'width=1280,height=720';
@@ -1259,9 +1271,13 @@ async function bukaMonitor() {
       if (lain) fitur = 'left=' + lain.availLeft + ',top=' + lain.availTop + ',width=' + lain.availWidth + ',height=' + lain.availHeight;
     }
   } catch (e) {}
+  let sudahAda = false;
+  try { sudahAda = !!(_monitorWin && !_monitorWin.closed && _monitorWin.document.readyState === 'complete'); } catch (e) {}
   const w = window.open(url, 'labuku_monitor', fitur);
   if (!w) { showToast('Info', 'Jendela diblokir browser. Izinkan pop-up untuk situs ini, atau buka: ' + url, 'warning'); return; }
-  showToast('Monitor', fitur.indexOf('left=') === 0 ? 'Monitor dibuka di layar kedua. Klik ⚙ di monitor → Layar penuh.' : 'Seret jendela Monitor ke layar kedua, lalu klik ⚙ → Layar penuh.', 'info');
+  _monitorWin = w;
+  if (sudahAda) kirimIzinPenuh_(w); // jendela monitor sudah terbuka → langsung minta layar penuh
+  showToast('Monitor', (fitur.indexOf('left=') === 0 ? 'Monitor dibuka di layar kedua' : 'Seret jendela Monitor ke layar kedua') + ' dan langsung layar penuh. Bila belum penuh, klik sekali di monitor.', 'info');
 }
 
 function refreshFrontOffice(silent, done) {
@@ -1677,7 +1693,7 @@ function katalogSorted() {
 
 /* v4: semua layanan tampil per kategori (klik untuk membuka), tetap bisa dicari; paling sering dipakai di atas. */
 const layananPickers = {};
-const NAMA_PILIH_LAIN = 'Lain-lain (tulis sendiri)';
+const NAMA_PILIH_LAIN = 'Layanan Lainnya (tulis sendiri)'; // v6.12
 /* v6.6: pilih lebih dari satu layanan sekaligus (maks. 5) — tiap layanan tetap jadi ID & nomor antrean sendiri. */
 const MAKS_LAYANAN = 5;
 const pilihanLayanan = {};
@@ -1691,7 +1707,7 @@ function layananPickerHtml(prefix, selectedIds, lainTeks) {
     <input type="text" class="form-control" id="${prefix}Cari" autocomplete="off" placeholder="${list.length ? 'Tambah layanan lain (opsional)...' : 'Cari layanan...'}"
       value="" oninput="renderLayananPicker('${prefix}')" onfocus="renderLayananPicker('${prefix}')">
     <div class="lpx-box" id="${prefix}List" style="display:none;"></div>
-    <input class="form-control lain-input" id="${prefix}Lain" maxlength="80" placeholder="Tulis layanan yang dibutuhkan (Lain-lain)" value="${escapeHtml(lainTeks || '')}"${prefix === 'ta' ? ' oninput="infoLanjutan_()"' : ''} style="${lain ? '' : 'display:none;'}">`;
+    <input class="form-control lain-input" id="${prefix}Lain" maxlength="80" placeholder="Tulis layanan lainnya yang dibutuhkan" value="${escapeHtml(lainTeks || '')}"${prefix === 'ta' ? ' oninput="infoLanjutan_()"' : ''} style="${lain ? '' : 'display:none;'}">`;
 }
 
 function namaPilihan_(id) { const k = katalogById(id); return !k ? id : (k.ID === KATALOG_LAIN.ID ? NAMA_PILIH_LAIN : k.NamaLayanan); }
@@ -1887,7 +1903,7 @@ function submitTambahAntrean() {
   if (!dipilih.length) { showToast('Peringatan', 'Pilih layanan dari daftar.', 'warning'); renderLayananPicker('ta'); return; }
   if (dipilih.indexOf(KATALOG_LAIN.ID) >= 0) {
     data.layananLain = String(document.getElementById('taLain').value || '').replace(/\s+/g, ' ').trim();
-    if (data.layananLain.length < 3) { showToast('Peringatan', 'Tuliskan layanan yang dibutuhkan (Lain-lain).', 'warning'); document.getElementById('taLain').focus(); return; }
+    if (data.layananLain.length < 3) { showToast('Peringatan', 'Tuliskan layanan lainnya yang dibutuhkan.', 'warning'); document.getElementById('taLain').focus(); return; }
   }
   // v6.6: daftar layanan (satu atau lebih); katalogId tetap diisi layanan pertama (cocok dengan server lama)
   data.layanan = dipilih.map(id => ({ katalogId: id, layananLain: id === KATALOG_LAIN.ID ? data.layananLain : '' }));
