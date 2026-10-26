@@ -30,6 +30,28 @@
     .chip-l { display: inline-flex; align-items: center; gap: .3rem; background: #DCFCE7; color: #1B4332; border: 1px solid rgba(27,67,50,.3); border-radius: 999px; padding: .3rem .35rem .3rem .8rem; font-size: .9rem; font-weight: 600; }
     .chip-l button { border: 0; background: rgba(0,0,0,.08); color: inherit; width: 1.5rem; height: 1.5rem; border-radius: 50%; line-height: 1; font-size: 1.05rem; padding: 0; }
     .ticket .num.kecil { font-size: 2rem; line-height: 1.25; }
+    /* v6.13: pemilih layanan — kelompok dulu, lalu cari; satu kolom cari/tulis bergantian */
+    .pk-judul { font-size: .8rem; font-weight: 600; color: #475569; margin: .1rem 0 .45rem; }
+    .pk-grid { display: grid; grid-template-columns: 1fr 1fr; gap: .5rem; }
+    .pk-kat { display: flex; flex-direction: column; align-items: flex-start; gap: .15rem; text-align: left; background: #fff; border: 1.5px solid #E5E7EB; border-radius: 12px; padding: .65rem .7rem; color: #111827; min-height: 86px; }
+    .pk-kat:hover, .pk-kat:focus-visible { border-color: #1B4332; background: #F0FDF4; }
+    .pk-kat .ik { font-size: 1.35rem; line-height: 1; }
+    .pk-kat b { font-size: .86rem; line-height: 1.2; }
+    .pk-kat small { font-size: .72rem; color: #64748B; line-height: 1.25; display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+    .pk-semua { display: block; width: 100%; margin-top: .55rem; background: #F8FAFC; border: 1.5px dashed #CBD5E1; border-radius: 12px; padding: .6rem; font-size: .86rem; color: #334155; }
+    .pk-atas { display: flex; align-items: center; gap: .5rem; margin-bottom: .4rem; }
+    .pk-kembali { border: 0; background: #F1F5F9; color: #1B4332; border-radius: 999px; padding: .3rem .8rem; font-weight: 600; font-size: .85rem; flex: 0 0 auto; }
+    .pk-katnama { font-weight: 700; font-size: .9rem; color: #1B4332; min-width: 0; }
+    .pk-ket { font-size: .8rem; color: #475569; margin-top: .35rem; }
+    .pk-ket:empty { display: none; }
+    .pk-aksi { margin-top: .5rem; }
+    .pk-aksi:empty { display: none; }
+    .pk-tulis-link { border: 0; background: none; color: #475569; font-size: .82rem; text-decoration: underline; padding: .2rem 0; text-align: left; }
+    .pk-baris { display: flex; gap: .5rem; align-items: center; flex-wrap: wrap; }
+    .pk-ok { background: #1B4332; color: #fff; border: 0; border-radius: 10px; font-weight: 600; padding: .55rem 1.1rem; }
+    .pk-tambah { margin-top: .2rem; border: 1.5px dashed #94A3B8; background: #fff; color: #1B4332; border-radius: 999px; padding: .4rem 1rem; font-weight: 600; font-size: .86rem; }
+    .lpx-head.lain { text-transform: none; letter-spacing: 0; font-size: .75rem; }
+    #fCari.mode-tulis { border-color: #1B4332; box-shadow: 0 0 0 .15rem rgba(27,67,50,.15); }
     .btn-kontak { background: #fff; color: #1B4332; border: 2px solid #1B4332; border-radius: 10px; font-weight: 600; padding: .7rem; }
     .btn-kontak:hover { background: #F0FDF4; color: #1B4332; }
     .langkah { font-size: .85rem; color: #475569; text-align: center; margin: .25rem 0 .6rem; }
@@ -80,9 +102,26 @@
           <label class="form-label" for="fCari">Layanan yang Dituju <span class="fw-normal text-secondary">(boleh lebih dari satu)</span></label>
           <input type="hidden" id="fLayanan" value="">
           <div class="pilihan" id="fInfo"></div>
-          <input class="form-control" id="fCari" autocomplete="off" placeholder="Cari layanan...">
-          <div class="lpx-box" id="fList"></div>
-          <input class="form-control mt-2" id="fLain" maxlength="80" style="display:none;" placeholder="Tulis layanan lainnya yang dibutuhkan">
+          <!-- v6.13: pilih KELOMPOK dulu → cari di dalamnya. Satu kolom saja: mode "cari" ⇄ "tulis sendiri" bergantian -->
+          <div class="pk" id="pkBox">
+            <div id="pkGridBox">
+              <div class="pk-judul">1. Pilih kelompok layanan</div>
+              <div class="pk-grid" id="pkKat"></div>
+              <button type="button" class="pk-semua" id="pkSemua">🔍 Belum tahu kelompoknya? <b>Cari semua layanan</b></button>
+            </div>
+            <div id="pkCariBox" style="display:none;">
+              <div class="pk-atas">
+                <button type="button" class="pk-kembali" id="pkKembali" aria-label="Kembali ke daftar kelompok">‹ Kelompok</button>
+                <span class="pk-katnama" id="pkKatNama"></span>
+              </div>
+              <div class="pk-judul" id="pkJudul">2. Ketik kata kunci, lalu ketuk layanannya</div>
+              <input class="form-control" id="fCari" autocomplete="off" maxlength="80" enterkeyhint="search">
+              <div class="pk-ket" id="pkKet"></div>
+              <div class="lpx-box" id="fList"></div>
+              <div class="pk-aksi" id="pkAksi"></div>
+            </div>
+          </div>
+          <button type="button" class="pk-tambah" id="pkTambah" style="display:none;">＋ Tambah layanan lain</button>
         </div>
         <div class="hp" aria-hidden="true"><label>Website <input id="fWebsite" tabindex="-1" autocomplete="off"></label></div>
         <div id="fErr" class="err mb-2"></div>
@@ -139,28 +178,10 @@
       document.title = 'Ambil Antrean ' + (FORM_DATA.instansi || '') + ' — LABUKU Desk';
       LAYANAN = [];
       (FORM_DATA.groups || []).forEach(function (g) {
-        g.items.forEach(function (it) { LAYANAN.push({ id: it.id, nama: it.nama, kategori: g.kategori, pakai: it.pakai || 0 }); });
+        g.items.forEach(function (it) { LAYANAN.push({ id: it.id, nama: it.nama, kategori: g.kategori, pakai: it.pakai || 0, ket: String(it.ket || '').toLowerCase() }); });
       });
-      OPTS = {
-        items: LAYANAN,
-        kategori: (FORM_DATA.groups || []).map(function (g) { return g.kategori; }),
-        lain: LAIN,
-        onPick: function (l) {
-          /* v6.6: boleh memilih lebih dari satu layanan (maks. 5); tiap layanan dapat nomor antrean sendiri */
-          if (!PILIH.some(function (x) { return x.id === l.id; })) {
-            if (PILIH.length >= 5) { el('fErr').textContent = 'Maksimal 5 layanan sekali daftar.'; return; }
-            PILIH.push({ id: l.id, nama: l.nama });
-          }
-          el('fCari').value = '';
-          segarkanPilihan();
-          /* v6.4: Lain-lain → pemohon menulis sendiri layanan yang dibutuhkan */
-          PICKER.hide();
-        }
-      };
-      PICKER = LabukuUI.LayananList(el('fList'), OPTS);
-      PICKER.render('');
-      el('fCari').addEventListener('input', function () { saringPicker(); PICKER.render(el('fCari').value); });
-      el('fCari').addEventListener('focus', function () { saringPicker(); PICKER.render(el('fCari').value); });
+      KATS = (FORM_DATA.groups || []).map(function (g) { return g.kategori; });
+      pasangPemilih();
       if (FORM_DATA.wilayahHome) {
         WIL = LabukuUI.Wilayah(el('fWilayah'), { home: FORM_DATA.wilayahHome, id: 'fW' });
       } else {
@@ -170,18 +191,167 @@
     }
 
     var LAYANAN = [];
-    var PICKER = null;
-    var OPTS = null;
-    var PILIH = [];
-    var LAIN = { id: '__LAIN__', nama: 'Layanan Lainnya (tulis sendiri)', kategori: 'Layanan Lain-lain', pakai: 0 }; // v6.12: "Layanan Lainnya" 
+    var KATS = [];
+    var PILIH = []; /* v6.6: boleh lebih dari satu layanan (maks. 5); tiap layanan dapat nomor antrean sendiri */
+    var LAIN_ID = '__LAIN__'; // v6.12: "Layanan Lainnya" — v6.13: hanya lewat tautan "tulis sendiri" setelah mencari
 
-    /* v6.6: layanan yang sudah dipilih tampil sebagai chip (bisa dihapus) dan tidak muncul lagi di daftar */
-    function saringPicker() {
-      if (!OPTS) return;
-      var ids = PILIH.map(function (x) { return x.id; });
-      OPTS.items = LAYANAN.filter(function (l) { return ids.indexOf(l.id) === -1; });
-      OPTS.lain = ids.indexOf('__LAIN__') === -1 ? LAIN : null;
+    /* ---------- v6.13: pemilih layanan publik ----------
+     * 1. Kelompok layanan (kotak besar + contoh layanan) → 2. cari di kelompok itu (kata kunci + sinonim).
+     * Tidak ketemu → tautan kecil "Tulis sendiri": KOLOM YANG SAMA berubah jadi isian nama layanan (teks yang diketik ikut).
+     * "Layanan Lainnya" tidak lagi tampil sebagai pilihan di daftar, supaya pengunjung memilih layanan yang benar dulu. */
+    var KAT_AKTIF = null;   // nama kategori; '*' = semua layanan
+    var MODE = 'cari';      // 'cari' | 'tulis'
+    var IKON = [['Perkawinan', '💍'], ['Keluarga', '👪'], ['Kemasjidan', '🕌'], ['Keagamaan', '📖'], ['Zakat', '🤲'], ['Data', '🗂️'], ['Administrasi', '🏛️'], ['Halal', '✅']];
+    var SINONIM = {
+      nikah: ['kawin', 'perkawinan', 'menikah', 'kehendak'], kawin: ['nikah', 'perkawinan'], menikah: ['nikah'], daftar: ['pendaftaran', 'kehendak'],
+      hilang: ['penggantian', 'pengganti', 'duplikat'], rusak: ['penggantian', 'pengganti', 'duplikat'], duplikat: ['penggantian', 'pengganti', 'salinan'], ganti: ['penggantian', 'perubahan'], salah: ['perbaikan'], buku: ['akta', 'kutipan'],
+      waris: ['hukum islam', 'konsultasi'], belum: ['belum menikah'], lajang: ['belum menikah'], janda: ['belum menikah', 'status'],
+      numpang: ['rekomendasi'], luar: ['rekomendasi'], pindah: ['rekomendasi'], rekom: ['rekomendasi'],
+      cerai: ['rujuk', 'perceraian', 'konseling'], rujuk: ['cerai'], isbat: ['itsbat'], itsbat: ['isbat'],
+      tanah: ['wakaf'], wakaf: ['ikrar', 'tanah'], sertifikat: ['sertifikasi', 'wakaf', 'halal'],
+      masjid: ['kemasjidan', 'musala', 'mushola', 'kiblat', 'takmir'], mushola: ['musala', 'masjid'], kiblat: ['arah'],
+      halal: ['sertifikasi', 'produk'], umkm: ['halal', 'produk'], zakat: ['infak', 'sedekah'], sedekah: ['zakat', 'infak', 'sedekah'], infaq: ['infak'],
+      konsultasi: ['bimbingan', 'konseling'], curhat: ['konseling'], keluarga: ['konseling', 'bimbingan'], bimwin: ['bimbingan perkawinan'], suscatin: ['bimbingan perkawinan'],
+      legalisir: ['legalisasi'], legalisasi: ['legalisir'], cap: ['legalisasi', 'legalisir'], surat: ['keterangan', 'rekomendasi'],
+      mualaf: ['muallaf', 'masuk islam', 'syahadat'], muallaf: ['mualaf'], ormas: ['kelembagaan', 'organisasi'], majelis: ['taklim', 'kelembagaan']
+    };
+    function pendekKat(k) { return String(k || '').replace(/^Layanan /, '').replace(/ dan /g, ' & '); }
+    function ikonKat(k) { for (var i = 0; i < IKON.length; i++) if (String(k).indexOf(IKON[i][0]) >= 0) return IKON[i][1]; return '📋'; }
+    function dipilih(id) { return PILIH.some(function (x) { return x.id === id; }); }
+    /* nilai kecocokan: 2 = semua kata ada di nama/kelompok, 1 = perlu deskripsi layanan, 0 = tidak cocok */
+    function adaKata(hay, w) {
+      if (hay.indexOf(w) !== -1) return true;
+      var s = SINONIM[w] || [];
+      for (var i = 0; i < s.length; i++) if (hay.indexOf(s[i]) !== -1) return true;
+      return false;
     }
+    function cocok(it, words) {
+      var nama = (it.nama + ' ' + it.kategori).toLowerCase(), semua = nama + ' ' + (it.ket || '');
+      if (words.every(function (w) { return adaKata(nama, w); })) return 2;
+      return words.every(function (w) { return adaKata(semua, w); }) ? 1 : 0;
+    }
+    function urutPakai(a, b) { return (b.pakai - a.pakai) || String(a.nama).localeCompare(String(b.nama)); }
+    function saringCocok(list, words) {
+      return list.map(function (x) { return { x: x, n: cocok(x, words) }; }).filter(function (o) { return o.n > 0; })
+        .sort(function (a, b) { return (b.n - a.n) || urutPakai(a.x, b.x); }).map(function (o) { return o.x; });
+    }
+    function btnItem(it) {
+      var b = document.createElement('button'); b.type = 'button'; b.className = 'lpx-item'; b.setAttribute('data-id', it.id);
+      var sp = document.createElement('span'); sp.textContent = it.nama; b.appendChild(sp);
+      b.addEventListener('click', function () { pilihLayanan({ id: it.id, nama: it.nama }); });
+      return b;
+    }
+    function head(teks, kls) { var d = document.createElement('div'); d.className = 'lpx-head' + (kls ? ' ' + kls : ''); d.textContent = teks; return d; }
+
+    function pasangPemilih() {
+      var grid = el('pkKat'); grid.innerHTML = '';
+      KATS.forEach(function (kat) {
+        var isi = LAYANAN.filter(function (x) { return x.kategori === kat; }).sort(urutPakai);
+        var b = document.createElement('button'); b.type = 'button'; b.className = 'pk-kat'; b.setAttribute('data-kat', kat);
+        var ik = document.createElement('span'); ik.className = 'ik'; ik.textContent = ikonKat(kat);
+        var nm = document.createElement('b'); nm.textContent = pendekKat(kat);
+        var ct = document.createElement('small'); ct.textContent = isi.slice(0, 2).map(function (x) { return x.nama; }).join(', ') + (isi.length > 2 ? ', …' : '');
+        b.appendChild(ik); b.appendChild(nm); b.appendChild(ct);
+        b.addEventListener('click', function () { bukaKat(kat); });
+        grid.appendChild(b);
+      });
+      el('pkSemua').addEventListener('click', function () { bukaKat('*'); });
+      el('pkKembali').addEventListener('click', function () { if (MODE === 'tulis') modeCari(); else bukaGrid(); });
+      el('fCari').addEventListener('input', function () { if (MODE === 'cari') renderDaftar(); else el('fErr').textContent = ''; });
+      el('fCari').addEventListener('keydown', function (ev) {
+        if (ev.key !== 'Enter') return;
+        ev.preventDefault();
+        if (MODE === 'tulis') { simpanTulis(); return; }
+        var satu = el('fList').querySelector('.lpx-item');
+        if (satu && el('fList').querySelectorAll('.lpx-item').length === 1) satu.click();
+      });
+      el('pkTambah').addEventListener('click', function () { el('pkTambah').style.display = 'none'; el('pkBox').style.display = ''; bukaGrid(); });
+      bukaGrid();
+    }
+    function bukaGrid() {
+      KAT_AKTIF = null; MODE = 'cari';
+      el('pkGridBox').style.display = ''; el('pkCariBox').style.display = 'none';
+      el('fCari').value = ''; el('fCari').classList.remove('mode-tulis');
+    }
+    function bukaKat(kat) {
+      KAT_AKTIF = kat;
+      el('pkGridBox').style.display = 'none'; el('pkCariBox').style.display = '';
+      el('pkKatNama').textContent = kat === '*' ? 'Semua layanan' : ikonKat(kat) + ' ' + pendekKat(kat);
+      modeCari();
+      try { el('fCari').focus({ preventScroll: true }); } catch (e) { el('fCari').focus(); }
+    }
+    function modeCari() {
+      MODE = 'cari';
+      var inp = el('fCari');
+      inp.classList.remove('mode-tulis'); inp.maxLength = 80;
+      inp.setAttribute('enterkeyhint', 'search');
+      inp.placeholder = KAT_AKTIF === '*' ? 'Ketik kata kunci, mis. nikah, wakaf, duplikat' : 'Ketik kata kunci untuk mencari…';
+      el('pkJudul').textContent = '2. Ketik kata kunci, lalu ketuk layanannya';
+      el('pkKembali').textContent = '‹ Kelompok';
+      el('fList').style.display = '';
+      renderDaftar();
+    }
+    function renderDaftar() {
+      var q = el('fCari').value.toLowerCase().replace(/\s+/g, ' ').trim();
+      var words = q ? q.split(' ') : [];
+      var semua = LAYANAN.filter(function (x) { return !dipilih(x.id); });
+      var diKat = KAT_AKTIF === '*' ? semua : semua.filter(function (x) { return x.kategori === KAT_AKTIF; });
+      var hasil = (q ? saringCocok(diKat, words) : diKat.slice().sort(urutPakai)).slice(0, 40);
+      var box = el('fList'); box.innerHTML = '';
+      hasil.forEach(function (it) { box.appendChild(btnItem(it)); });
+      var lain = [];
+      if (q && KAT_AKTIF !== '*') lain = saringCocok(semua.filter(function (x) { return x.kategori !== KAT_AKTIF; }), words).slice(0, 8);
+      if (lain.length) {
+        box.appendChild(head(hasil.length ? 'Juga ada di kelompok lain' : 'Tidak ada di kelompok ini — ditemukan di kelompok lain:', 'lain'));
+        lain.forEach(function (it) { var b = btnItem(it); var k = document.createElement('small'); k.textContent = pendekKat(it.kategori); b.appendChild(k); box.appendChild(b); });
+      }
+      if (!hasil.length && !lain.length) {
+        var d = document.createElement('div'); d.className = 'lpx-empty';
+        d.textContent = q ? 'Layanan "' + el('fCari').value.trim() + '" tidak ditemukan. Coba kata lain, mis. nikah, duplikat, wakaf.' : 'Belum ada layanan di kelompok ini.';
+        box.appendChild(d);
+      }
+      // "Tulis sendiri" hanya muncul SETELAH pengunjung mencari (minimal 3 huruf) — bukan pilihan utama
+      var aksi = el('pkAksi'); aksi.innerHTML = '';
+      el('pkKet').textContent = '';
+      if (q.length >= 3 && !dipilih(LAIN_ID)) {
+        var t = document.createElement('button'); t.type = 'button'; t.className = 'pk-tulis-link'; t.id = 'pkTulis';
+        t.textContent = (hasil.length || lain.length ? 'Bukan yang dicari? ' : 'Tetap tidak ada? ') + 'Tulis sendiri nama layanannya';
+        t.addEventListener('click', modeTulis);
+        aksi.appendChild(t);
+      }
+    }
+    function modeTulis() {
+      MODE = 'tulis';
+      var inp = el('fCari');
+      inp.classList.add('mode-tulis'); inp.setAttribute('enterkeyhint', 'done');
+      inp.placeholder = 'Tulis layanan yang Anda butuhkan, mis. konsultasi waris';
+      el('pkJudul').textContent = 'Tulis layanan yang Anda butuhkan';
+      el('pkKembali').textContent = '‹ Kembali cari';
+      el('fList').style.display = 'none';
+      el('pkKet').textContent = 'Tulis singkat dan jelas. Petugas akan mengarahkan Anda di loket.';
+      var aksi = el('pkAksi'); aksi.innerHTML = '';
+      var row = document.createElement('div'); row.className = 'pk-baris';
+      var ok = document.createElement('button'); ok.type = 'button'; ok.className = 'pk-ok'; ok.id = 'pkTulisOk'; ok.textContent = 'Tambahkan';
+      ok.addEventListener('click', simpanTulis);
+      var kb = document.createElement('button'); kb.type = 'button'; kb.className = 'pk-tulis-link'; kb.textContent = '‹ Kembali pilih dari daftar';
+      kb.addEventListener('click', modeCari);
+      row.appendChild(ok); row.appendChild(kb); aksi.appendChild(row);
+      inp.focus();
+    }
+    function simpanTulis() {
+      var t = el('fCari').value.replace(/\s+/g, ' ').trim();
+      if (t.length < 3) { el('fErr').textContent = 'Tuliskan layanan yang dibutuhkan (minimal 3 huruf).'; el('fCari').focus(); return false; }
+      pilihLayanan({ id: LAIN_ID, nama: 'Layanan Lainnya: ' + t, lain: t });
+      return true;
+    }
+    function pilihLayanan(it) {
+      if (!dipilih(it.id)) {
+        if (PILIH.length >= 5) { el('fErr').textContent = 'Maksimal 5 layanan sekali daftar.'; return; }
+        PILIH.push(it);
+      }
+      segarkanPilihan();
+    }
+    /* chip layanan terpilih (bisa dihapus); pemilih dilipat agar form tetap ringkas */
     function segarkanPilihan() {
       var box = el('fInfo');
       box.innerHTML = '';
@@ -193,10 +363,10 @@
         c.appendChild(b); box.appendChild(c);
       });
       el('fLayanan').value = PILIH.length ? PILIH[0].id : '';
-      el('fCari').placeholder = PILIH.length ? 'Tambah layanan lain (opsional)...' : 'Cari layanan...';
-      el('fLain').style.display = PILIH.some(function (x) { return x.id === '__LAIN__'; }) ? '' : 'none';
       el('fErr').textContent = '';
-      saringPicker();
+      bukaGrid();
+      el('pkBox').style.display = PILIH.length ? 'none' : '';
+      el('pkTambah').style.display = PILIH.length && PILIH.length < 5 ? '' : 'none';
     }
     var WIL = null;
 
@@ -206,10 +376,10 @@
       var nik = el('fNik').value.replace(/\D/g, '');
       var wil = WIL ? WIL.getValue() : { ok: false, error: 'Data wilayah belum tersedia.' };
       if (!wil.ok) { el('fErr').textContent = wil.error; el('fWilayah').scrollIntoView({ block: 'center' }); return; }
-      if (!PILIH.length) { el('fErr').textContent = 'Pilih layanan dari daftar.'; saringPicker(); PICKER.render(el('fCari').value); return; }
-      var lain = el('fLain').value.replace(/\s+/g, ' ').trim();
-      var adaLain = PILIH.some(function (x) { return x.id === '__LAIN__'; });
-      if (adaLain && lain.length < 3) { el('fErr').textContent = 'Tuliskan layanan yang dibutuhkan.'; el('fLain').focus(); return; }
+      if (MODE === 'tulis' && el('fCari').value.trim().length >= 3) simpanTulis(); // v6.13: lupa menekan "Tambahkan"
+      if (!PILIH.length) { el('fErr').textContent = 'Pilih layanan: ketuk kelompoknya dulu, lalu ketuk layanannya.'; el('pkBox').scrollIntoView({ block: 'center' }); return; }
+      var lainObj = PILIH.filter(function (x) { return x.id === LAIN_ID; })[0];
+      var lain = lainObj ? lainObj.lain : '';
       el('fErr').textContent = '';
       var btn = el('fBtn');
       btn.disabled = true; btn.textContent = 'Memproses...';
@@ -220,8 +390,8 @@
         alamat: el('fAlamat').value.trim(),
         wilayah: wil.data,
         katalogId: PILIH[0].id,
-        layananLain: PILIH[0].id === '__LAIN__' ? lain : '',
-        layanan: PILIH.map(function (x) { return { katalogId: x.id, layananLain: x.id === '__LAIN__' ? lain : '' }; }),
+        layananLain: PILIH[0].id === LAIN_ID ? lain : '',
+        layanan: PILIH.map(function (x) { return { katalogId: x.id, layananLain: x.id === LAIN_ID ? lain : '' }; }),
         website: el('fWebsite').value
       };
       google.script.run
@@ -348,11 +518,10 @@
 
     function resetForm() {
       el('fForm').reset();
-      el('fLain').style.display = 'none'; el('tKuaBox').style.display = 'none';
+      el('tKuaBox').style.display = 'none';
       hentikanHitung(); el('tGambarInfo').style.display = 'none';
       try { localStorage.removeItem(KUNCI_TIKET); } catch (e) {}
       PILIH = []; segarkanPilihan();
-      if (PICKER) PICKER.render('');
       if (WIL) WIL.setMode('utama');
       el('ticketBox').style.display = 'none';
       el('formBox').style.display = 'block';

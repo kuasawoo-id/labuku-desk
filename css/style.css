@@ -839,3 +839,23 @@ table.lb-table tbody td { padding: .9rem 1.1rem; }
 .bar-geser .bg-jalur::-webkit-scrollbar-thumb { background: #52796f; border-radius: 8px; }
 .bar-geser .bg-jalur::-webkit-scrollbar-track { background: var(--bg-surface); border-radius: 8px; }
 .bar-geser .bg-isi { height: 1px; }
+
+/* v6.13: data dari aplikasi desa KUA-Link (tetap di Front Office sampai diverifikasi) */
+.badge-kualink { background: #EDE9FE; color: #5B21B6; }
+[data-theme="dark"] .badge-kualink { background: rgba(167,139,250,.18); color: #c4b5fd; }
+table.lb-table.kartu-ringkas tbody td.kr-nama .badge-kualink { font-size: .66rem; padding: .08rem .4rem; }
+.fo-info-kl { max-width: 340px; }
+
+/* v6.13: tombol Buka Monitor (biru outline — beda dari hijau Tambah Antrean) */
+.btn-monitor { --bm: #1d5fbf; border: 1.5px solid var(--bm); color: var(--bm); background: transparent; border-radius: 10px; font-weight: 600; }
+.btn-monitor:hover, .btn-monitor:focus-visible { background: var(--bm); border-color: var(--bm); color: #fff; }
+[data-theme="dark"] .btn-monitor { --bm: #7fb0ff; }
+[data-theme="dark"] .btn-monitor:hover { color: #0d1b2a; }
+.btn-monitor.siap-penuh { animation: bmDenyut 1.1s ease-in-out infinite; background: var(--bm); color: #fff; }
+[data-theme="dark"] .btn-monitor.siap-penuh { color: #0d1b2a; }
+@keyframes bmDenyut { 0%, 100% { box-shadow: 0 0 0 0 rgba(29,95,191,.55); } 50% { box-shadow: 0 0 0 7px rgba(29,95,191,0); } }
+@media (prefers-reduced-motion: reduce) { .btn-monitor.siap-penuh { animation: none; } }
+@media (max-width: 767.98px) {
+  #foMonitorBtn .label-hp { display: none; }
+  #foMonitorBtn { flex: 0 0 auto !important; }
+}

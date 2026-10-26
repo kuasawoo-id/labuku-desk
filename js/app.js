@@ -1048,6 +1048,8 @@ function foStatusInfo(r) {
   if (r.Status === 'Menunggu') return { label: 'Menunggu', cls: 'badge-menunggu' };
   if (r.Status === 'Di Loket') return { label: 'Di Loket', cls: 'badge-diloket' };
   if (r.Status === 'Terlewat') return { label: 'Terlewat', cls: 'badge-terlewat' };
+  if (r.Status === 'Terdaftar') return { label: 'Terdaftar Desa', cls: 'badge-kualink' }; // v6.13: KUA-Link, catin belum diverifikasi
+  if (r.Status === 'Batal') return { label: 'Dibatalkan Desa', cls: 'badge-ditolak' };
   if (r.LayananStatus === 'Diproses') return { label: 'Proses', cls: 'badge-proses' };
   if (r.LayananStatus === 'Pending') return { label: 'Pending', cls: 'badge-pending' };
   if (r.LayananStatus === 'Selesai') return { label: 'Selesai', cls: 'badge-selesai' };
@@ -1082,6 +1084,7 @@ function renderFrontOffice() {
         <div class="d-flex gap-2 flex-wrap head-aksi">
           <button class="btn btn-labuku-outline btn-filter-hp" onclick="toggleFilterHp('foFilterBar', this)"><i class="bi bi-funnel"></i> Filter</button>
           <button class="btn btn-labuku-outline" id="foSapaBtn" onclick="sapaPengunjungFo()" title="Tampilkan sapaan & cara ambil antrean di layar monitor (45 detik)"><i class="bi bi-emoji-smile"></i> <span class="label-lebar">Selamat Datang</span><span class="label-hp">Sapa</span></button>
+          <button class="btn btn-monitor" id="foMonitorBtn" onclick="bukaMonitor()" title="Buka layar monitor antrean di layar kedua"><i class="bi bi-display"></i> <span class="label-lebar" id="foMonitorLbl">Buka Monitor</span><span class="label-hp">Monitor</span></button>
           <button class="btn btn-labuku-outline" onclick="openQrModal()"><i class="bi bi-qr-code"></i> <span class="label-lebar">Link &amp; QR Form Publik</span><span class="label-hp">QR</span></button>
           <button class="btn btn-labuku-outline" id="foWaMassalBtn" onclick="bukaWaMassal()" title="Kirim WA nomor antrean ke semua yang belum"><i class="bi bi-whatsapp"></i> <span class="label-lebar">WA Belum Terkirim</span><span class="label-hp">WA</span> <span class="badge rounded-pill text-bg-success" id="foWaMassalN">0</span></button>
           <button class="btn btn-labuku-outline" onclick="bukaPengaturanPerangkat()" title="Suara panggilan & WhatsApp Desktop (perangkat ini)" aria-label="Pengaturan perangkat"><i class="bi bi-sliders"></i></button>
@@ -1091,6 +1094,7 @@ function renderFrontOffice() {
       <div class="lb-card filter-bar filter-hp mb-3" id="foFilterBar"></div>
       <div class="fo-stats" id="foStats"></div>
       <div class="table-wrap" id="foTableBox"></div>`;
+    aturTombolMonitor_();
   }
   renderFoFilterBar();
   renderFoTable();
@@ -1115,7 +1119,7 @@ function renderFoFilterBar() {
       <div class="col-6 col-md-1"><button class="btn btn-labuku-primary btn-sm w-100" onclick="terapkanFoRentang()">Terapkan</button></div>` : ''}
       <div class="col-6 col-md-2"><label class="form-label">Status</label>
         <select class="form-select form-select-sm" onchange="foFilter.status=this.value;renderFoTable()">
-          ${['', 'Menunggu', 'Di Loket', 'Proses', 'Pending', 'Selesai', 'Terlewat'].map(s => `<option value="${s}" ${s === f.status ? 'selected' : ''}>${s || 'Semua status'}</option>`).join('')}
+          ${['', 'Terdaftar Desa', 'Menunggu', 'Di Loket', 'Proses', 'Pending', 'Selesai', 'Terlewat'].map(s => `<option value="${s}" ${s === f.status ? 'selected' : ''}>${s || 'Semua status'}</option>`).join('')}
         </select></div>
       <div class="col-6 col-md-2"><label class="form-label">Kategori</label>
         <select class="form-select form-select-sm" onchange="foFilter.kategori=this.value;foFilter.layanan='';renderFoFilterBar();renderFoTable()"><option value="">Semua kategori</option>${o.kats}</select></div>
@@ -1123,7 +1127,7 @@ function renderFoFilterBar() {
         <select class="form-select form-select-sm" onchange="foFilter.layanan=this.value;renderFoTable()"><option value="">Semua layanan</option>${o.lays}</select></div>
       <div class="col-6 col-md-2"><label class="form-label">Sumber</label>
         <select class="form-select form-select-sm" onchange="foFilter.sumber=this.value;renderFoTable()">
-          ${['', 'Loket', 'Online'].map(s => `<option value="${s}" ${s === f.sumber ? 'selected' : ''}>${s || 'Semua'}</option>`).join('')}
+          ${['', 'Loket', 'Online', 'KUA-Link'].map(s => `<option value="${s}" ${s === f.sumber ? 'selected' : ''}>${s || 'Semua'}</option>`).join('')}
         </select></div>
     </div>`;
 }
@@ -1174,6 +1178,8 @@ function renderFoStats(list) {
     ['Selesai', c(r => foStatusInfo(r).label === 'Selesai')],
     ['Online', c(r => r.Sumber === 'Online')]
   ];
+  const nKl = c(r => r.Sumber === 'KUA-Link'); // v6.13
+  if (nKl) items.push(['KUA-Link', nKl]);
   box.innerHTML = items.map(([k, v]) => `<div class="fo-stat">${k}<b>${v}</b></div>`).join('');
 }
 
@@ -1186,7 +1192,7 @@ function renderFoTable() {
     ? 'Antrean hari ini · ' + new Date().toLocaleDateString('id-ID', { weekday: 'long', day: '2-digit', month: 'long', year: 'numeric' })
     : 'Antrean ' + fmtDate(r0.dari) + ' – ' + fmtDate(r0.sampai);
   const u = urutTabel.fo;
-  const STATUS_URUT = ['Menunggu', 'Di Loket', 'Proses', 'Pending', 'Selesai', 'Terlewat'];
+  const STATUS_URUT = ['Terdaftar Desa', 'Menunggu', 'Di Loket', 'Proses', 'Pending', 'Selesai', 'Terlewat', 'Dibatalkan Desa'];
   const AMBIL = {
     no: r => waktuMs(r.Waktu) * 1000 + (parseInt(String(r.Nomor).replace(/\D/g, ''), 10) || 0),
     tgl: r => waktuMs(r.Waktu),
@@ -1208,14 +1214,16 @@ function renderFoTable() {
       <tbody>
         ${list.map(r => {
           const st = foStatusInfo(r);
-          const waiting = r.Status === 'Menunggu' || r.Status === 'Di Loket';
+          const waiting = r.Status === 'Menunggu' || r.Status === 'Di Loket' || r.Status === 'Terdaftar'; // v6.13: Terdaftar = KUA-Link
+          const kl = r.Sumber === 'KUA-Link';
           let aksi = '';
           if (r._temp) aksi = '<span class="spinner-border spinner-border-sm text-secondary"></span>';
           else {
-            if (r.Status === 'Menunggu' || r.Status === 'Terlewat') aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="panggilFo('${r.ID}')">Panggil</button>`;
+            if (r.Status === 'Menunggu' || r.Status === 'Terlewat' || r.Status === 'Terdaftar') aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="panggilFo('${r.ID}')">Panggil</button>`;
             if (waiting) aksi += `<button class="btn btn-labuku-accent btn-sm-pill" onclick="openVerifikasiPanel('${r.LayananID}')"><i class="bi bi-clipboard-check"></i> Verifikasi</button>`;
-            if (waiting) aksi += `<button class="btn btn-ikon-aksi${r.WaAntrean ? ' wa-sudah' : ''}" title="${r.WaAntrean ? 'WA nomor antrean sudah dikirim — kirim ulang' : 'Kirim nomor antrean via WhatsApp'}" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i>${r.WaAntrean ? '<i class="bi bi-check-circle-fill wa-cek"></i>' : ''}</button>`;
-            if (waiting) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
+            if (kl && r.BerkasDesa) aksi += `<a class="btn btn-ikon-aksi" href="${escapeHtml(r.BerkasDesa)}" target="_blank" rel="noopener" title="Buka PDF berkas desa (KUA-Link)" aria-label="Berkas desa"><i class="bi bi-file-earmark-pdf"></i></a>`;
+            if (waiting && !(kl && !r.NoHP)) aksi += `<button class="btn btn-ikon-aksi${r.WaAntrean ? ' wa-sudah' : ''}" title="${r.WaAntrean ? 'WA nomor antrean sudah dikirim — kirim ulang' : 'Kirim nomor antrean via WhatsApp'}" aria-label="Kirim WA" onclick="waAntrean('${r.ID}')"><i class="bi bi-whatsapp"></i>${r.WaAntrean ? '<i class="bi bi-check-circle-fill wa-cek"></i>' : ''}</button>`;
+            if (waiting && !kl) aksi += `<button class="btn btn-ikon-aksi" title="Tandai terlewat" aria-label="Tandai terlewat" onclick="terlewatFo('${r.ID}')"><i class="bi bi-skip-forward"></i></button>`;
             // v6.4: sudah diverifikasi (Proses/Pending/Selesai) → menu Detail
             if (!waiting && r.Status !== 'Terlewat' && r.LayananID) aksi += `<button class="btn btn-labuku-outline btn-sm-pill" onclick="lihatDetailRiwayat('${r.LayananID}')"><i class="bi bi-eye"></i> Detail</button>`;
             // v6.9: layanan Selesai → panggil pemohon mengambil berkas di PTSP
@@ -1226,8 +1234,8 @@ function renderFoTable() {
             <td class="fw-bold fs-6 kr-id" style="white-space:nowrap;">${escapeHtml(r.Nomor)}</td>
             ${showTgl ? `<td class="kr-meta" style="white-space:nowrap;">${fmtDate(r.Waktu)}</td>` : ''}
             <td class="kr-nama"><div class="fw-semibold">${escapeHtml(namaKapital(r.PemohonNama))}</div>
-              <div class="small text-secondary">${r.Sumber === 'Online' ? '<span class="badge-status badge-online me-1">Online</span>' : ''}${escapeHtml(r.NoHP || '')}</div></td>
-            <td class="kr-layanan">${escapeHtml(r.LayananNama)}<div class="small text-secondary">${r.KatalogID === KATALOG_LAIN.ID ? '<span class="badge-status badge-model">Layanan Lainnya</span> isian pengunjung' : escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}</td>
+              <div class="small text-secondary">${r.Sumber === 'Online' ? '<span class="badge-status badge-online me-1">Online</span>' : ''}${kl ? '<span class="badge-status badge-kualink me-1">KUA-Link</span>' : ''}${kl && ymd(r.Waktu) !== ymd(new Date()) ? 'daftar ' + escapeHtml(fmtDate(r.Waktu)) + ' ' : ''}${escapeHtml(r.NoHP || '')}</div></td>
+            <td class="kr-layanan">${escapeHtml(r.LayananNama)}<div class="small text-secondary">${r.KatalogID === KATALOG_LAIN.ID ? '<span class="badge-status badge-model">Layanan Lainnya</span> isian pengunjung' : escapeHtml(kategoriOf(r).replace(/^Layanan /, ''))}</div>${r.CatatanPending && st.label === 'Pending' ? `<div class="small text-secondary fst-italic">${escapeHtml(r.CatatanPending)}</div>` : ''}${kl && /^KUA-Link /.test(r.Info || '') ? `<div class="small text-secondary fo-info-kl">${escapeHtml(String(r.Info).replace(/^KUA-Link [^·]*·\s*/, ''))}</div>` : ''}</td>
             <td class="kr-status"><span class="badge-status ${st.cls}">${st.label}</span></td>
             <td class="fo-actions" style="text-align:right;">${aksi}</td>
           </tr>`;
@@ -1249,35 +1257,69 @@ function kirimKeMonitor_(pesan) {
 }
 
 /* v6.8: buka layar monitor; bila browser mendukung (Chrome/Edge), langsung ditaruh di monitor kedua.
- * v6.12: langsung LAYAR PENUH tanpa klik — klik "Buka Monitor" diteruskan ke jendela monitor sebagai izin layar penuh
- * (Fullscreen Capability Delegation, Chrome/Edge). Izin klik hanya berlaku ±5 detik, jadi dikirim begitu monitor siap. */
-let _monitorWin = null;
+ * v6.13: layar penuh dengan 2 klik di tombol yang sama.
+ *   Penyebab bug v6.12 [Kemungkinan Besar]: Chrome MENGHABISKAN izin klik saat window.open membuka jendela, sehingga izin
+ *   layar penuh yang diteruskan sesudahnya ditolak → jendela besar tetapi taskbar & bar judul Windows masih tampil.
+ *   Klik 1: monitor dibuka setengah layar di layar kedua → tombol menjadi "Jadikan Layar Penuh".
+ *   Klik 2: TANPA window.open — izin klik masih utuh dan diteruskan ke monitor (Fullscreen Capability Delegation)
+ *   → monitor penuh sempurna. Klik buatan ("tab otomatis") tidak bisa dipakai: browser hanya mengakui klik manusia. */
+let _monitorWin = null, _monitorPenuh = false, _monitorCek = 0;
 window.addEventListener('message', ev => {
-  if (ev.origin !== location.origin || !ev.data || ev.data.tipe !== 'monitor-siap' || !_monitorWin || ev.source !== _monitorWin) return;
-  kirimIzinPenuh_(_monitorWin);
+  if (ev.origin !== location.origin || !ev.data || !_monitorWin || ev.source !== _monitorWin) return;
+  if (ev.data.tipe === 'monitor-siap') { _monitorPenuh = false; kirimIzinPenuh_(_monitorWin); aturTombolMonitor_(); }
+  if (ev.data.tipe === 'monitor-penuh') { _monitorPenuh = !!ev.data.penuh; aturTombolMonitor_(); }
 });
-function kirimIzinPenuh_(w) {
+function kirimIzinPenuh_(w, paksa) {
   if (!w || w.closed) return;
-  try { w.postMessage({ tipe: 'labuku-penuh' }, { targetOrigin: location.origin, delegate: 'fullscreen' }); }
-  catch (e) { try { w.postMessage({ tipe: 'labuku-penuh' }, location.origin); } catch (e2) {} }
+  const msg = { tipe: 'labuku-penuh', paksa: !!paksa };
+  try { w.postMessage(msg, { targetOrigin: location.origin, delegate: 'fullscreen' }); }
+  catch (e) { try { w.postMessage(msg, location.origin); } catch (e2) {} }
+}
+function monitorTerbuka_() { try { return !!(_monitorWin && !_monitorWin.closed); } catch (e) { return false; } }
+function aturTombolMonitor_() {
+  const buka = monitorTerbuka_();
+  if (!buka) _monitorPenuh = false;
+  const b = document.getElementById('foMonitorBtn'), lbl = document.getElementById('foMonitorLbl');
+  if (b && lbl) {
+    const siap = buka && !_monitorPenuh;
+    b.classList.toggle('siap-penuh', siap);
+    lbl.textContent = siap ? 'Layar Penuh' : (buka ? 'Monitor Aktif' : 'Buka Monitor');
+    b.title = siap ? 'Klik sekali lagi: monitor menjadi layar penuh sempurna' : (buka ? 'Monitor sudah layar penuh' : 'Buka layar monitor antrean di layar kedua');
+  }
+  if (buka && !_monitorCek) _monitorCek = setInterval(aturTombolMonitor_, 2000); // jendela monitor ditutup → tombol kembali
+  if (!buka && _monitorCek) { clearInterval(_monitorCek); _monitorCek = 0; }
 }
 async function bukaMonitor() {
+  // Klik ke-2 (monitor sudah terbuka): jangan window.open lagi agar izin klik tidak habis
+  if (monitorTerbuka_()) {
+    kirimIzinPenuh_(_monitorWin, true);
+    setTimeout(() => { if (monitorTerbuka_() && !_monitorPenuh) showToast('Monitor', 'Belum penuh? Klik sekali di layar monitor.', 'info'); }, 1500);
+    return;
+  }
   const url = new URL('monitor.html', location.href).href;
-  let fitur = 'width=1280,height=720';
+  let fitur = 'width=960,height=540';
+  let diLayarKedua = false;
   try {
-    if ('getScreenDetails' in window) {
+    if ('getScreenDetails' in window && (!window.screen || window.screen.isExtended !== false)) {
       const sd = await window.getScreenDetails();
       const lain = (sd.screens || []).find(x => x !== sd.currentScreen);
-      if (lain) fitur = 'left=' + lain.availLeft + ',top=' + lain.availTop + ',width=' + lain.availWidth + ',height=' + lain.availHeight;
+      if (lain) { // setengah ukuran, di tengah layar kedua
+        const w2 = Math.round(lain.availWidth / 2), h2 = Math.round(lain.availHeight / 2);
+        fitur = 'left=' + Math.round(lain.availLeft + lain.availWidth / 4) + ',top=' + Math.round(lain.availTop + lain.availHeight / 4) + ',width=' + w2 + ',height=' + h2;
+        diLayarKedua = true;
+      }
     }
   } catch (e) {}
-  let sudahAda = false;
-  try { sudahAda = !!(_monitorWin && !_monitorWin.closed && _monitorWin.document.readyState === 'complete'); } catch (e) {}
-  const w = window.open(url, 'labuku_monitor', fitur);
+  // Jendela monitor yang masih terbuka (mis. LABUKU Desk dimuat ulang) dipakai lagi tanpa dimuat ulang
+  const w = window.open('', 'labuku_monitor', fitur);
   if (!w) { showToast('Info', 'Jendela diblokir browser. Izinkan pop-up untuk situs ini, atau buka: ' + url, 'warning'); return; }
-  _monitorWin = w;
-  if (sudahAda) kirimIzinPenuh_(w); // jendela monitor sudah terbuka → langsung minta layar penuh
-  showToast('Monitor', (fitur.indexOf('left=') === 0 ? 'Monitor dibuka di layar kedua' : 'Seret jendela Monitor ke layar kedua') + ' dan langsung layar penuh. Bila belum penuh, klik sekali di monitor.', 'info');
+  let kosong = true;
+  try { kosong = !w.location.href || w.location.href === 'about:blank'; } catch (e) {}
+  if (kosong) w.location.href = url;
+  else { try { w.postMessage({ tipe: 'labuku-status' }, location.origin); } catch (e) {} } // sudah terbuka: tanyakan apakah sudah penuh
+  _monitorWin = w; _monitorPenuh = false;
+  aturTombolMonitor_();
+  showToast('Monitor', (diLayarKedua ? 'Monitor terbuka di layar kedua.' : 'Seret jendela Monitor ke layar kedua.') + ' Klik "Layar Penuh" (tombol biru berkedip) sekali lagi agar penuh sempurna.', 'info');
 }
 
 function refreshFrontOffice(silent, done) {
@@ -1820,7 +1862,8 @@ function cekNikTambah(nilai) {
     document.getElementById('taAlamat').value = d.alamat || '';
     if (taWil && d.wilayahState) taWil.restore(d.wilayahState);
     if (info) info.innerHTML = '<span class="badge-status badge-online">Pengunjung lama</span>';
-    if (d.pending && d.pending.length) popupPending(d);
+    if (d.kualink && d.kualink.length) popupKualink(d); // v6.13: sudah didaftarkan desa → cegah antrean dobel
+    else if (d.pending && d.pending.length) popupPending(d);
     else popupPengunjungLama(d.nama);
   }, () => { if (info) info.textContent = ''; }).cekPemohonNik(nik);
 }
@@ -1866,6 +1909,36 @@ function infoLanjutan_() {
   const lainTeks = String((document.getElementById('taLain') || {}).value || '').trim().toLowerCase();
   const cocok = (window._pendingNik || []).filter(x => dipilih.indexOf(x.katalogId) >= 0 && (x.katalogId !== KATALOG_LAIN.ID || String(x.jenis).trim().toLowerCase() === lainTeks));
   box.innerHTML = cocok.map(p => `<div class="lanjut-info mb-2"><i class="bi bi-arrow-repeat"></i> Melanjutkan pending <b>${escapeHtml(p.id)}</b>${p.kekurangan && p.kekurangan.length ? ' · kekurangan dulu: ' + escapeHtml(p.kekurangan.join(', ')) : ''}${p.keterangan ? '<div class="small mt-1">Keterangan: ' + escapeHtml(p.keterangan) + '</div>' : ''}</div>`).join('');
+}
+
+/* v6.13: catin sudah didaftarkan desa lewat KUA-Link → cukup Verifikasi di baris KL-xxx (tidak perlu Tambah Antrean). */
+function popupKualink(d) {
+  const body = document.getElementById('formModalBody');
+  if (!body) return;
+  const lama = document.getElementById('popupLama');
+  if (lama) lama.remove();
+  const k0 = d.kualink[0];
+  const el = document.createElement('div');
+  el.id = 'popupLama';
+  el.className = 'popup-lama';
+  el.innerHTML = `<div class="popup-lama-kartu popup-pending" role="alertdialog" aria-live="assertive">
+      <div class="d-flex align-items-center gap-2 mb-1"><i class="bi bi-link-45deg text-primary"></i><div class="fw-bold">Sudah didaftarkan desa (KUA-Link)</div></div>
+      <div class="small text-secondary mb-2 text-start">${escapeHtml(d.nama || '')}</div>
+      ${d.kualink.map(k => `<div class="pending-item text-start"><div class="fw-semibold">${escapeHtml(k.nomor)} · ${escapeHtml(k.jenis)}</div>
+        <div class="small text-secondary">${escapeHtml(String(k.keterangan || '').replace(/^KUA-Link [^·]*·\s*/, ''))}</div></div>`).join('')}
+      <div class="small text-start mt-2">Tidak perlu Tambah Antrean. Tutup form ini, lalu klik <b>Verifikasi</b> pada baris <b>${escapeHtml(k0.nomor)}</b> di Front Office.</div>
+      <button type="button" class="btn btn-labuku-primary w-100 mt-3" id="popupLamaYa" onclick="keBarisKualink('${escapeHtml(k0.id)}')">Tutup form &amp; tampilkan barisnya</button>
+      <button type="button" class="btn btn-link btn-sm w-100 mt-1" onclick="document.getElementById('popupLama').remove()">Tetap tambah antrean baru</button>
+    </div>`;
+  body.appendChild(el);
+  setTimeout(() => { const b = document.getElementById('popupLamaYa'); if (b) b.focus(); }, 30);
+}
+function keBarisKualink(layananId) {
+  closeFormModal();
+  foSearch = layananId;
+  const inp = document.getElementById('globalSearchInput');
+  if (inp) inp.value = layananId;
+  if (window.AppState.currentSection === 'frontoffice') renderFoTable();
 }
 
 function popupPengunjungLama(nama) {
@@ -2177,7 +2250,7 @@ function submitVerifikasiUI(layananId, hasil) {
   }
   verifikasiPanelLayananId = null;
   closeFormModal();
-  const row = (window.AppState.fo || []).find(x => x.LayananID === layananId && (x.Status === 'Menunggu' || x.Status === 'Di Loket'));
+  const row = (window.AppState.fo || []).find(x => x.LayananID === layananId && (x.Status === 'Menunggu' || x.Status === 'Di Loket' || x.Status === 'Terdaftar'));
   const backup = row ? Object.assign({}, row) : null;
   const boBackup = (window.AppState.bo || []).slice();
   const statusBaru = hasil === 'lanjut' ? 'Diproses' : (hasil === 'selesai' ? 'Selesai' : 'Pending');

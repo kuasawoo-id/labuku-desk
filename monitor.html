@@ -953,9 +953,9 @@
     document.addEventListener('mouseleave', function () { document.body.classList.remove('dekat-gear'); });
     function sudahPenuh() { return !!document.fullscreenElement || (window.innerWidth >= screen.width && window.innerHeight >= screen.height); }
     function aturHint() { el('hintPenuh').classList.toggle('sembunyi-h', sudahPenuh() || layar().penuhOto === false || el('panel').classList.contains('buka')); }
-    function masukPenuh() {
+    function masukPenuh(paksa) {
       var d = document.documentElement;
-      if (sudahPenuh() || !d.requestFullscreen) return;
+      if (!d.requestFullscreen || document.fullscreenElement || (!paksa && sudahPenuh())) return; // v6.13: perintah dari tombol FO tidak memakai tebakan ukuran
       d.requestFullscreen({ navigationUI: 'hide' }).catch(function () {});
     }
     // Browser mewajibkan gestur pengguna: klik/sentuh/tombol pertama di mana saja langsung membuat layar penuh.
@@ -981,9 +981,13 @@
        Bila keduanya tidak tersedia, tetap berlaku "klik sekali di mana saja". */
     window.addEventListener('message', function (ev) {
       if (ev.origin !== location.origin || !ev.data || ev.data.tipe !== 'labuku-penuh') return;
-      if (layar().penuhOto !== false) masukPenuh();
+      if (ev.data.paksa || layar().penuhOto !== false) masukPenuh(!!ev.data.paksa); // v6.13: tombol "Jadikan Layar Penuh" di FO selalu berlaku
     });
     try { if (window.opener && !window.opener.closed) window.opener.postMessage({ tipe: 'monitor-siap' }, location.origin); } catch (e) {}
+    /* v6.13: kabari Front Office apakah monitor sudah layar penuh (tombol "Jadikan Layar Penuh" ⇄ "Monitor Aktif") */
+    function laporPenuh() { try { if (window.opener && !window.opener.closed) window.opener.postMessage({ tipe: 'monitor-penuh', penuh: !!document.fullscreenElement }, location.origin); } catch (e) {} }
+    document.addEventListener('fullscreenchange', laporPenuh);
+    window.addEventListener('message', function (ev) { if (ev.origin === location.origin && ev.data && ev.data.tipe === 'labuku-status') laporPenuh(); });
     if (layar().penuhOto !== false) setTimeout(masukPenuh, 300);
 
     terapkanLayar();
