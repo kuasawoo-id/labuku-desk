@@ -2141,11 +2141,11 @@ function renderVerifikasiPanel(res, layananId) {
   const panel = document.getElementById('formModalBody');
   if (!panel || verifikasiPanelLayananId !== layananId) return;
   if (!res.success) { panel.innerHTML = emptyState('bi-exclamation-triangle', res.message); return; }
-  const { layanan, pemohon, persyaratan, jejak } = res.data;
+  const { layanan, pemohon, persyaratan, jejak, akad } = res.data;
   const model = modelOf(katalogById(layanan.KatalogID));
   const foRow = (window.AppState.fo || []).find(x => x.LayananID === layananId) || {};
   const hp = (pemohon && pemohon.NoHP) || foRow.NoHP || '';
-  window._verifData = { layanan: layanan, pemohon: pemohon || {}, model: model, hp: hp };
+  window._verifData = { layanan: layanan, pemohon: pemohon || {}, model: model, hp: hp, akad: akad || null };
 
   panel.innerHTML = `
     <div class="d-flex justify-content-between flex-wrap gap-2 mb-3">
@@ -2172,6 +2172,7 @@ function renderVerifikasiPanel(res, layananId) {
           ${p.DivalidasiOleh ? `<div class="small text-secondary">Diperiksa ${escapeHtml(p.DivalidasiOleh)}</div>` : ''}
         </div>
       </label>`).join('') + '</div>'}
+    ${akad ? akadBlokHtml(akad) : ''}
 
     <h6 class="fw-bold mt-3 mb-1">Keterangan</h6>
     <textarea class="form-control mb-3" id="catatanVerifikasi" rows="2" placeholder="Opsional — tampil di Back Office & WA. Saat Pending, yang belum dicentang otomatis disebut."></textarea>
@@ -2194,6 +2195,63 @@ function renderVerifikasiPanel(res, layananId) {
   updateVerifButtons();
 }
 
+/* ════════ v6.15: DATA AKAD (Pendaftaran Kehendak Nikah) → Akad Tracker saat Lengkap ════════ */
+const AKAD_WAJIB = { nama_suami: 'nama calon suami', nama_istri: 'nama calon istri', tanggal_akad: 'tanggal akad', jam_akad: 'jam akad', lokasi_akad: 'tempat akad', desa: 'desa', wali_jenis: 'wali' };
+
+function akadBlokHtml(a) {
+  const d = a.data || {};
+  const v = k => escapeHtml(d[k] || '');
+  const inp = (k, label, extra, col) => `<div class="${col || 'col-12 col-md-6'}"><label class="form-label" for="akd_${k}">${label}${AKAD_WAJIB[k] ? ' <span class="text-danger">*</span>' : ''}</label>
+      <input class="form-control form-control-sm akad-in" id="akd_${k}" data-akad="${k}" value="${v(k)}" ${extra || ''} oninput="updateVerifButtons()"></div>`;
+  const sel = (k, label, opsi) => `<div class="col-6 col-md-3"><label class="form-label" for="akd_${k}">${label} <span class="text-danger">*</span></label>
+      <select class="form-select form-select-sm akad-in" id="akd_${k}" data-akad="${k}" onchange="updateVerifButtons()"><option value="">Pilih</option>${opsi.map(o => `<option${o === d[k] ? ' selected' : ''}>${escapeHtml(o)}</option>`).join('')}</select></div>`;
+  const status = a.status === 'TERKIRIM' ? `<span class="badge-status badge-selesai">Sudah di Akad Tracker</span>`
+    : /^GAGAL/.test(a.status) ? `<span class="badge-status badge-ditolak" title="${escapeHtml(a.pesan)}">Gagal kirim, dikirim ulang otomatis</span>` : '';
+  return `
+    <div class="d-flex align-items-center justify-content-between flex-wrap gap-2 mt-3 mb-1">
+      <h6 class="fw-bold mb-0"><i class="bi bi-calendar-heart"></i> Data Akad</h6>
+      <div class="d-flex gap-2 flex-wrap">${a.sumber === 'KUA-Link'
+        ? `<span class="badge-status badge-kualink" title="Terisi dari kiriman desa; boleh dikoreksi">KUA-Link ${escapeHtml(a.nomor)}</span>`
+        : '<span class="badge-status badge-netral">Pendaftaran di KUA</span>'}${status}</div>
+    </div>
+    <div class="small text-secondary mb-2">${a.aktif ? 'Dikirim ke Akad Tracker saat <b>Lengkap</b>. Pending tidak dikirim.' : 'Akad Tracker belum disambungkan (Admin: jalankan <code>aturAkadTracker</code>). Data tetap disimpan.'}</div>
+    <div class="row g-2" id="akadBlok">
+      ${inp('nama_suami', 'Nama Calon Suami')}
+      ${inp('nama_istri', 'Nama Calon Istri')}
+      ${inp('tanggal_akad', 'Tanggal Akad', 'type="date"', 'col-6 col-md-3')}
+      ${inp('jam_akad', 'Jam Akad', 'type="time"', 'col-6 col-md-3')}
+      ${sel('lokasi_akad', 'Tempat Akad', a.lokasi || ['Kantor KUA', 'Luar Kantor KUA'])}
+      ${sel('wali_jenis', 'Wali', ['Nasab', 'Hakim'])}
+      ${inp('tempat_akad', 'Alamat Akad', 'placeholder="Wajib bila di luar kantor"')}
+      ${inp('desa', 'Desa')}
+      ${inp('wali_nama', 'Nama Wali', 'placeholder="Opsional"')}
+      ${inp('modin', 'Modin', 'placeholder="Opsional"')}
+      ${inp('wa_catin', 'No. WA Catin', 'inputmode="tel" placeholder="Opsional"')}
+    </div>`;
+}
+
+/** Isian Data Akad di panel (null bila blok tidak tampil). */
+function akadAmbil() {
+  const blok = document.getElementById('akadBlok');
+  if (!blok) return null;
+  const v = window._verifData && window._verifData.akad ? Object.assign({}, window._verifData.akad.data) : {};
+  blok.querySelectorAll('[data-akad]').forEach(el => { v[el.getAttribute('data-akad')] = el.value.trim(); });
+  return v;
+}
+
+/** Isian wajib yang masih kosong (kosong = lengkap). */
+function akadKurang() {
+  const v = akadAmbil();
+  if (!v) return [];
+  const k = Object.keys(AKAD_WAJIB).filter(f => !v[f]).map(f => AKAD_WAJIB[f]);
+  if (v.lokasi_akad === 'Luar Kantor KUA' && !v.tempat_akad) k.push('alamat akad');
+  document.querySelectorAll('#akadBlok [data-akad]').forEach(el => {
+    const f = el.getAttribute('data-akad');
+    el.classList.toggle('is-invalid', (!!AKAD_WAJIB[f] && !v[f]) || (f === 'tempat_akad' && v.lokasi_akad === 'Luar Kantor KUA' && !v.tempat_akad));
+  });
+  return k;
+}
+
 /** Tombol "Lengkap" hanya aktif bila SEMUA persyaratan sudah dicentang. */
 function updateVerifButtons() {
   const boxes = document.querySelectorAll('#formModalBody .verif-check');
@@ -2202,10 +2260,12 @@ function updateVerifButtons() {
   const btn = document.getElementById('btnVerifLengkap');
   const hint = document.getElementById('verifHint');
   if (count) count.textContent = boxes.length ? checked + ' / ' + boxes.length + ' lengkap' : 'Tanpa checklist';
-  const lengkap = checked === boxes.length;
+  const akadK = akadKurang();   // v6.15: Data Akad wajib lengkap
+  const lengkap = checked === boxes.length && !akadK.length;
   if (btn) btn.disabled = !lengkap;
   const langsung = window._verifData && window._verifData.model === 'Langsung';
-  if (hint) hint.textContent = lengkap ? (langsung ? 'Selesai → WA terkirim ke pemohon.' : '') : 'Centang semua untuk mengaktifkan "Lengkap".';
+  if (hint) hint.textContent = checked !== boxes.length ? 'Centang semua untuk mengaktifkan "Lengkap".'
+    : akadK.length ? 'Lengkapi Data Akad: ' + akadK.join(', ') + '.' : (langsung ? 'Selesai → WA terkirim ke pemohon.' : '');
 }
 
 function centangSemua() {
@@ -2236,7 +2296,10 @@ function submitVerifikasiUI(layananId, hasil) {
     if (!catatan) catatan = 'Belum lengkap: ' + kurang.join('; ');
   } else if (kurang.length) {
     showToast('Peringatan', 'Masih ada persyaratan yang belum dicentang.', 'warning'); return;
+  } else if (akadKurang().length) {
+    showToast('Peringatan', 'Lengkapi Data Akad: ' + akadKurang().join(', ') + '.', 'warning'); return;
   }
+  const akad = hasil === 'pending' ? undefined : (akadAmbil() || undefined);   // v6.15: dikirim ke Akad Tracker saat Lengkap
   const v = window._verifData || {};
   /* v6.2: Selesai selalu disertai WA; checkbox hanya untuk Pending. */
   const kirimWa = hasil === 'selesai' || !!(document.getElementById('verifKirimWa') || {}).checked;
@@ -2277,7 +2340,9 @@ function submitVerifikasiUI(layananId, hasil) {
     if (!res || !res.success) { rollback((res && res.message) || 'Server tidak merespons.'); return; }
     pendingEnd();
     showToast('Berhasil', hasil === 'lanjut' ? 'Status Proses — layanan masuk Back Office.' : hasil === 'selesai' ? 'Layanan Selesai di Front Office — tercatat di riwayat Back Office.' : 'Status Pending tersimpan.', 'success');
-  }, err => rollback(err.message || String(err))).submitVerifikasi(layananId, catatan, hasil, null);
+    const ka = res.data && res.data.akad;   // v6.15
+    if (ka) showToast('Akad Tracker', ka.status === 'TERKIRIM' ? 'Jadwal akad masuk Akad Tracker.' : ka.status === 'BELUM_DIATUR' ? 'Akad Tracker belum disambungkan, jadwal belum dikirim.' : 'Gagal: ' + ka.pesan + ' Dikirim ulang otomatis.', ka.status === 'TERKIRIM' ? 'success' : 'warning');
+  }, err => rollback(err.message || String(err))).submitVerifikasi(layananId, catatan, hasil, null, akad);
 }
 
 // ════════════════════════════════════════════════════════
